@@ -1,5 +1,6 @@
 :root {
     --highlight-color:rgb(221, 30, 12);
+    --highlight-color-dark:rgb(136, 22, 12);
 }
 
 body {
@@ -21,6 +22,7 @@ a {
 a:hover{
     text-decoration: underline;
 }
+
 
 .navbar{
     width:100%;
@@ -58,8 +60,18 @@ a:hover{
 .button-link::before{
     content: "\2197\00a0\00a0";
 }
+
 .button-link:hover{
     background-color: #c8c8ca;
+}
+
+.text-link{
+    color: var(--highlight-color-dark);
+    /* text-decoration: underline; */
+}
+
+.email:hover::after{
+    content: ":  at usi.ch";
 }
 
 .imagecontainer{
