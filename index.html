@@ -1,65 +1,129 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
     <div class="container">
-        <div class="narrow textcontainer">
+        <div class="section">
 
             <div class="headline">
-                <h1>Sophie Kergaßner</h1>
-                <img src="img/Sophie.jpg" alt="Sophie Kergaßner" class="profile-image">
+                <div class="headline-name">
+                    <h1>
+                        Sophie Kergaßner
+                    </h1>
+                    <p class="headline-text-wide">
+                        I am a second year PhD student under the supervision of <a class="text-link" href="https://pdf.inf.usi.ch">Prof. Piotr Didyk</a> at Università della Svizzera italiana in Lugano, Switzerland. 
+                        My research interest lies in the quantification of human vision, and the manipulation of images for improved perceptual quality and efficient rendering, especially for AR/VR displays.
+                    </p>
+                </div>
+                <img class="headline-image" src="img/Sophie.jpg" alt="Sophie Kergaßner">
             </div>
 
-
-            <p class="standardtext">
-                I am a first year PhD student under the supervision of <a class="text-link" href="https://pdf.inf.usi.ch">Prof. Piotr Didyk</a> at Università della Svizzera italiana in Lugano, Switzerland. 
+            <p class="headline-text-narrow">
+                I am a second year PhD student under the supervision of <a class="text-link" href="https://pdf.inf.usi.ch">Prof. Piotr Didyk</a> at Università della Svizzera italiana in Lugano, Switzerland. 
                 My research interest lies in the quantification of human vision, and the manipulation of images for improved perceptual quality and efficient rendering, especially for AR/VR displays.
             </p>
 
-            <div style="display: flex;">
+            <div class="button-container">
                 <a class="button-link" href="https://search.usi.ch/it/persone/a13fc682b2f8451192887573450b229a/kergassner-sophie">E-Mail</a>
-                <a class="button-link" style="margin-left:3%;" href="https://www.linkedin.com/in/sophie-kergassner/">LinkedIn</a>
-                <a class="button-link" style="margin-left:3%;" href="https://orcid.org/0009-0000-4883-4694">ORCiD</a>
-                <a class="button-link" style="margin-left:3%;" href="https://scholar.google.com/citations?user=f-jf8tIAAAAJ">Scholar</a>
-                
+                <a class="button-link" href="https://www.linkedin.com/in/sophie-kergassner/">LinkedIn</a>
+                <a class="button-link" href="https://orcid.org/0009-0000-4883-4694">ORCiD</a>
+                <a class="button-link" href="https://scholar.google.com/citations?user=f-jf8tIAAAAJ">Scholar</a>
             </div>
-
         </div>
 
-        <div class="narrow textcontainer">
+        <div class="section">
             <h2>Publications</h2>
             <!--<p>Please hold on while I finish this section... &#x1f6a7;</p>-->
             
-<div class="publication">
-    <img src="img/HiveFive360_Teaser.png" class="teaser-image">
-            <p class="standardtext">
-
-                &#127941; Honorable Mention Paper Award &#127941;<br>
-                <span style="font-size: 0.8em"><u>S. Kergaßner</u>, N. Doerr, M. Wieland, M. Fuchs,
-                    M. Sedlmair</span><br>
-                <span style="font-weight: bold;"><a href="https://doi.org/10.1145/3670653.3670662">HiveFive360: Extending the VR Gaze Guidance Technique HiveFive to
-                    Highlight Out-Of-FOV Targets</a></span><br>
-                <span style="font-style: italic;">Proc. Mensch und Computer 2024</span><br>
-
-                <!--&#127942;-->
-            </p>
-        </div>
             <div class="publication">
-                <img src="img/SimulatedLightfield_Teaser.jpg"  class="teaser-image">
-            <p class="standardtext">
-                <span style="font-size: 0.8em"><u>S. Kergaßner</u>, J. Fröhlich</span><br>
-                <span style="font-weight: bold;">
-                    <a href="https://doi.org/10.2352/EI.2023.35.2.SDA-383">
-                            Evaluating the Angular Resolution of a Simulated Light Field
-                    Display in Regards to Three-Dimensionality, Motion Parallax and Viewing
-                    Experience </a> </span><br>
-                <span style="font-style: italic;">Electronic Imaging 2023</span><br>
-            </p>
+                <a style="display: contents" href="https://www.pdf.inf.usi.ch/projects/DepthInPeriphery/index.html">
+                    <img class="publication-teaser" src="img/DisparityInPeriphery_Teaser.jpg">
+                </a>
+
+                <div class="publication-description">
+                    <h3 class="publication-title">
+                        <a href="https://www.pdf.inf.usi.ch/projects/DepthInPeriphery/index.html">
+                            Towards Understanding Depth Perception in Foveated Rendering
+                        </a>
+                    </h3>
+
+                    <p class="publication-authors">
+                        <span class="author-highlight">Sophie Kergaßner</span>, Taimoor Tariq, Piotr Didyk
+                    </p>
+
+                    <p class="publication-venue" style="margin-top: 10px;">
+                        <em>ACM SIGGRAPH 2025</em>
+                    </p>
+
+                    <p class="publication-summary">
+                        We demonstrate that stereoacuity is remarkably resilient to foveated rendering and remains unaffected with up to 2× stronger foveation than commonly used. To this end, we design a psychovisual experiment and derive a simple perceptual model that determines the amount of foveation that does not affect stereoacuity.
+                    </p>
+                </div>
+            </div>
+
+            <div class="publication">
+                <a style="display: contents" href="https://doi.org/10.1145/3670653.3670662">
+                    <img class="publication-teaser" src="img/HiveFive360_Teaser.png">
+                </a>
+
+                <div class="publication-description">
+                    <h3 class="publication-title">
+                        <a href="https://doi.org/10.1145/3670653.3670662">
+                            HiveFive360: Extending the VR Gaze Guidance Technique HiveFive to Highlight Out-Of-FOV Targets
+                        </a>
+                    </h3>
+
+                    <p class="publication-authors">
+                        <span class="author-highlight">Sophie Kergaßner</span>, Nina Doerr, Markus Wieland, Martin Fuchs, Michael Sedlmair
+                    </p>
+
+                    <p class="publication-venue">
+                        <em>Proc. Mensch und Computer 2024</em>
+                    </p>
+
+                    <p class="publication-award">
+                        Honorable Mention Paper Award &#127941;
+                    </p>
+
+                    <p class="publication-summary">
+                        We extend the gaze guidance technique <span style="font-style: italic;">HiveFive</span> to guide users to out-of-FOV targets. Our technique is qualitatively and quantitatively evaluated in two user studies. Our results show that HiveFive360 is effective in guiding users to a target object, and diegetic, meaning that the scenic immersion of the scene is preserved.
+                    </p>
+                </div>
+            </div>
+
+            <div class="publication">
+                <a style="display: contents" href="https://doi.org/10.2352/EI.2023.35.2.SDA-383">
+                    <img class="publication-teaser" src="img/SimulatedLightfield_Teaser.jpg">
+                </a>
+
+                <div class="publication-description">
+                    <h3 class="publication-title">
+                        <a href="https://doi.org/10.2352/EI.2023.35.2.SDA-383">
+                            Evaluating the Angular Resolution of a Simulated Light Field Display in Regards to Three-Dimensionality, Motion Parallax and Viewing Experience
+                        </a>
+                    </h3>
+
+                    <p class="publication-authors">
+                        <span class="author-highlight">Sophie Kergaßner</span>, Jan Fröhlich
+                    </p>
+
+                    <p class="publication-venue">
+                        <em>Electronic Imaging 2023</em>
+                    </p>
+
+                    <p class="publication-summary">
+                        We show that the viewing experience of a multiview screen increases logarithmically with the presented number of views.
+                        This rise stagnates at around 0.25° per view. Below 0.5° per view, participants prefer a common 2D display.
+                    </p>
+
+                    <!-- <a class="publication-link" href="https://doi.org/10.2352/EI.2023.35.2.SDA-383">Paper</a> -->
+                </div>
             </div>
         </div>
     </div>
