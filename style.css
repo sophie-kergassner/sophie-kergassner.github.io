@@ -1,6 +1,7 @@
 :root {
     --highlight-color:rgb(221, 30, 12);
     --highlight-color-dark:rgb(136, 22, 12);
+    --gray-light: #f0f0f0;
     --border-radius: 10px;
 }
 

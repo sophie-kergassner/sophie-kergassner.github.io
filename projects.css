@@ -1,0 +1,56 @@
+h1 {
+    margin-top: 16px;
+    margin-bottom: 8px;
+}
+
+h3{
+    margin: 0;
+    color: #bbb;
+}
+
+.publication-authors {
+    font-size: 1.1em;
+    margin-bottom: 32px;
+}
+
+.container-wide{
+    max-width: 1200px;
+    /* background-color: var(--gray-light); */
+    border-radius: var(--border-radius);
+    margin: 64px 0;
+}
+
+.container-wide img {
+    max-width: 900px;
+    margin: 16px auto;
+    display: block;
+    width: 100%;
+}
+.container-wide p{
+    max-width: 900px;
+    margin: 16px auto;   
+    font-size: 0.8em;
+    color: #aaa;
+    /* line-height: normal; */
+}
+
+
+.bib {
+    font-family: monospace;
+    background: var(--gray-light);
+    border-radius: var(--border-radius);
+    padding:16px 20px;
+    color: #555;
+}
+.bib .row {
+    display:grid;
+    grid-template-columns: max-content max-content 1fr; /* key | = | value */
+    column-gap: 8px;
+    white-space: pre-wrap;          /* preserve line breaks & allow wrapping */
+    overflow-wrap: anywhere;        /* break long tokens if needed */
+    /* margin: 2px 0; */
+}
+.bib-key { 
+    width:90px; 
+    margin-left:30px;
+}

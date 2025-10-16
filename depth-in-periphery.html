@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="projects.css">
+
+</head>
+
+<body>
+    <div class="color-bar" style="height:7vh"></div>
+    <div class="container">
+        
+        <div class="section">
+            <h3>
+                ACM SIGGRAPH Conference Papers '25
+            </h3>
+            <h1>
+                Towards Understanding Depth Perception in Foveated Rendering
+            </h1>
+            
+            <p class="publication-authors">
+                <span class="author-highlight"><a href="https://sophie-kergassner.github.io">Sophie Kergaßner</a></span>, 
+                <a href="https://taimoor6864.github.io/">Taimoor Tariq</a>, 
+                <a href="https://www.pdf.inf.usi.ch/people/piotr/">Piotr Didyk</a><br>
+                <span style="font-style: italic; font-size: 0.8em;">Università della Svizzera italiana</span>
+            </p>
+            
+            <p>
+                We demonstrate that stereoacuity is remarkably resilient to foveated rendering and remains unaffected with up to 2× stronger foveation than commonly used. To this end, we design a psychovisual experiment and derive a simple perceptual model that determines the amount of foveation that does not affect stereoacuity.
+            </p>
+
+            <div class="button-container">
+                <a class="button-link" href="https://dl.acm.org/doi/pdf/10.1145/3721238.3730609" target="_blank" >
+                    <svg width="24" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
+                    Paper (14MB)
+                </a>
+                <a class="button-link" href="https://dl.acm.org/doi/10.1145/3721238.3730609" target="_blank" > 
+                    <svg width="24" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
+                    ACM Digital Library
+                </a>
+                <a class="button-link" href="https://www.pdf.inf.usi.ch/projects/DepthInPeriphery/poster.pdf" target="_blank" > 
+                    <svg width="24" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
+                    Poster
+                </a>
+                <!-- <a class="button-link" href="https://www.linkedin.com/in/sophie-kergassner/"> 
+                    <svg width="24" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
+                    Slides
+                </a> -->
+                <a class="button-link" href="https://www.pdf.inf.usi.ch" target="_blank" >    
+                    <svg width="24" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
+                    Group Page
+                </a>
+            </div>
+<!-- 
+        </div>
+
+        <div class="section"> -->
+            <div class="container-wide">
+        
+        <img src="projects/depth-in-periphery/teaser.jpg">
+            <p>
+                <span style="font-weight: bold;">Teaser:</span> We design a broadband stimulus to accurately estimate disparity thresholds across various eccentricities and blur levels. We fit a custom surface through the retrieved threshold estimations. It shows the lowest resolvable disparity 𝑇 as a continuous function of eccentricity 𝜃 and Gaussian filter sigma 𝜎. The green line denotes the minimum 𝑇-value per eccentricity 𝜃 , encoding the amount of blur that can be induced by foveated rendering without degrading stereoscopic depth perception. We validate our findings in a validation study, by showing participants unaltered renderings vs. strongly foveated renderings.
+            </p>
+    </div>
+        </div>
+    <!-- </div> -->
+    
+    <!-- <div class="container"> -->
+        <div class="section">
+            <!-- <h2>Summary</h2>
+            <p>
+                We demonstrate that stereoacuity is remarkably resilient to foveated rendering and remains unaffected with up to 2× stronger foveation than commonly used. To this end, we design a psychovisual experiment and derive a simple perceptual model that determines the amount of foveation that does not affect stereoacuity.
+            </p> -->
+            
+            <h2>Abstract</h2>
+            <p>
+                The true vision for real-time virtual and augmented reality is reproducing our visual reality in its entirety on immersive displays. To this end, foveated rendering leverages the limitations of spatial acuity in human peripheral vision to allocate computational resources to the fovea while reducing quality in the periphery. Such methods are often derived from studies on the spatial resolution of the human visual system and its ability to perceive blur in the periphery, enabling the potential for high spatial quality in real-time. However, the effects of blur on other visual cues that depend on luminance contrast, such as depth, remain largely unexplored. It is critical to understand this interplay, as accurate depth representation is a fundamental aspect of visual realism. In this paper, we present the first evaluation exploring the effects of foveated rendering on stereoscopic depth perception. We design a psychovisual experiment to quantitatively study the effects of peripheral blur on depth perception. Our analysis demonstrates that stereoscopic acuity remains unaffected (or even improves) by high levels of peripheral blur. Based on our studies, we derive a simple perceptual model that determines the amount of foveation that does not affect stereoacuity. Furthermore, we analyze the model in the context of common foveation practices reported in literature. The findings indicate that foveated rendering does not impact stereoscopic depth perception, and stereoacuity remains unaffected with up to 2× stronger foveation than commonly used. Finally, we conduct a validation experiment and show that our findings hold for complex natural stimuli.
+            </p>
+            
+            <h2>Video</h2>
+            <iframe style="width:100%; aspect-ratio:16/9; height:auto;" src="https://www.youtube.com/embed/Mhe3IYm-hXE?si=SzKIxIkDrl7tyPI4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+            
+            
+            <h2>BibTeX</h2>
+            <div class="bib" role="table" aria-label="BibTeX entry">
+                <div class="row" role="row"><span role="cell">@inproceedings{kergassner-2025,</span></div>
+                <div class="row" role="row"><span role="cell" class="bib-key">author</span><span role="cell">=</span><span role="cell">{Kerga\ss{}ner, Sophie and Tariq, Taimoor and Didyk, Piotr},</span></div>
+                <div class="row" role="row"><span class="bib-key">title</span><span>=</span><span>{Towards Understanding Depth Perception in Foveated Rendering},</span></div>
+                <div class="row" role="row"><span class="bib-key">year</span><span>=</span><span>{2025},</span></div>
+                <div class="row" role="row"><span class="bib-key">isbn</span><span>=</span><span>{9798400715402},</span></div>
+                <div class="row" role="row"><span class="bib-key">publisher</span><span>=</span><span>{Association for Computing Machinery},</span></div>
+                <div class="row" role="row"><span class="bib-key">address</span><span>=</span><span>{New York, NY, USA},</span></div>
+                <div class="row" role="row"><span class="bib-key">doi</span><span>=</span><span>{10.1145/3721238.3730609},</span></div>
+                <div class="row" role="row"><span class="bib-key">booktitle</span><span>=</span><span>{Proceedings of the Special Interest Group on Computer Graphics and Interactive Techniques Conference Conference Papers},</span></div>
+                <div class="row" role="row"><span class="bib-key">articleno</span><span>=</span><span>{42},</span></div>
+                <div class="row" role="row"><span class="bib-key">numpages</span><span>=</span><span>{9},</span></div>
+                <div class="row" role="row"><span class="bib-key">series</span><span>=</span><span>{SIGGRAPH Conference Papers '25}</span></div>
+                <div class="row" role="row"><span>}</span></div>
+            </div>
+
+
+        </div>
+        <div class="section">
+            <h2>Acknowledgements</h2>
+            <p>
+                This project has received funding from the European Research Council under the European Union’s Horizon 2020 research and innovation program (Grant 804226, PERDY).
+            </p>
+
+        </div>
+    </div>
+    <div class="color-bar" style="height:25vh"></div>
+</body>
+</html>
