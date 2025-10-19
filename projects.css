@@ -7,6 +7,10 @@ h3{
     margin: 0;
     color: #bbb;
 }
+
+sup{
+    font-size: 0.6em;
+}
 /* @media (max-width: 420px) {
     h3{
         font-size: 0.9em;

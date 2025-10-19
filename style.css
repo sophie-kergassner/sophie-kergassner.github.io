@@ -57,6 +57,7 @@ a:hover{
 }
 
 .button-link{
+  box-sizing: border-box; 
     display: flex;
     align-items: center; 
     justify-content: center;
@@ -67,16 +68,23 @@ a:hover{
     width: 100%;
     font-size:14px;
     font-weight: 700;
-    padding: 0;
-    /* margin:8px 0; */
+    flex: 1 1 22%;
+    text-align: center;
+    padding: 0 8px;
 }
-
-
 
 .button-link:hover{
     background-color: #dadada;
 }
 
+@media (max-width: 576px) {
+  .button-link {
+    /* font-size: ; */
+    flex: 1 1 48%;
+    margin-left: 0;
+    margin-bottom: 8px;
+  }
+}
 .button-container {
   display: flex;
   flex-wrap: wrap;
@@ -84,10 +92,6 @@ a:hover{
   margin-top: 24px;
 }
 
-.button-link {
-  flex: 1 1 22%;
-  text-align: center;
-}
 
 .text-link{
     color: var(--highlight-color-dark);
@@ -265,13 +269,6 @@ p {
   }
   .section{
     margin-bottom: 64px;
-  }
-
-  .button-link {
-    /* font-size: ; */
-    flex: 1 1 48%;
-    margin-left: 0;
-    margin-bottom: 8px;
   }
   .color-bar {
     display: block;
