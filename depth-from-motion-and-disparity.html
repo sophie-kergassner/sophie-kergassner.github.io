@@ -15,7 +15,17 @@
 </head>
 
 <body>
-    <div class="color-bar" style="height:7vh"></div>
+
+    <div class="home-bar"> 
+        <div class="container-wide"> 
+            <a href="index.html">
+                <svg width="18" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12H3M3 12l6-6M3 12l6 6" /></svg> 
+                Home
+            </a>
+        </div>
+    </div>
+
+
     <div class="container">
         
         <div class="section">
@@ -33,50 +43,59 @@
             </p>
             
             <p>
-                We examine the impact of blur on the depth perceived by motion parallax and evaluate the findings in comparison to our <a href="https://sophie-kergassner.github.io/depth-in-periphery.html">previous findings</a> on the impact of blur on stereoacuity.
+                We examine the impact of blur on the perceived depth by motion parallax and evaluate the findings in comparison to our <a href="https://sophie-kergassner.github.io/depth-in-periphery.html">previous findings</a> on the impact of blur on stereoacuity.
             </p>
 
-            <p>
-                &#x1f6a7;  The full paper will be published at the end of March.  &#x1f6a7;
-            </p>
 
 
             <div class="button-container">
+                <a class="button-link" href="projects/depth-from-motion-and-disparity/Kergassner-Didyk_The-Impact-of-Blur-on-Motion-Parallax-and-Binocular-Disparity.pdf" target="_blank"> 
+                    <svg width="18" height="12" viewBox="9 0 18 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
+                    Paper (5 MB)
+                </a>
                 <a class="button-link" href="projects/depth-from-motion-and-disparity/poster.pdf" target="_blank" > 
                     <svg width="18" height="12" viewBox="9 0 18 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
                     Poster
                 </a>
-                <!-- <a class="button-link" href="https://www.linkedin.com/in/sophie-kergassner/"> 
-                    <svg width="24" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
-                    Slides
-                </a> -->
                 <a class="button-link" href="https://www.pdf.inf.usi.ch" target="_blank" >    
                     <svg width="18" height="12" viewBox="9 0 18 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
                     Group Page
                 </a>
             </div>
-<!-- 
+
+            
+        
+
+            <!-- <iframe src="https://www.desmos.com/3d/04pcnb63cj" width="100%" style="min-height:60vh"></iframe> -->
+
+            <div class="container-wide">
+            
+            <img src="projects/depth-from-motion-and-disparity/teaser.jpg">
+                <p>
+                    <span style="font-weight: bold;">Teaser:</span> 
+                    Perceptual models of depth from binocular disparity (left) and motion parallax (right) under increasing peripheral blur.
+                    The red curves indicate the maximum blur that does not impair depth perception, while the white curves mark the threshold at which blur becomes perceptible.
+                    A larger gap between these curves reflects greater robustness to blur.
+                    While disparity remains stable far beyond the visibility threshold, motion parallax degrades as soon as blur becomes perceptible, leaving little margin for aggressive foveation.   
+                </p>
+            </div>
         </div>
 
-        <div class="section"> -->
-            
-        </div>
+
 
         <div class="section">
             <h2>Abstract</h2>
             <p>
-                Foveated rendering is a key technique for reducing computational load in immersive display systems by lowering image quality in the peripheral visual field while preserving high fidelity in the fovea. While its impact on spatial detail is well understood, its influence on other visual qualities &ndash; such as depth from motion parallax &ndash; remains unclear. In this work, we investigate how foveated rendering affects motion-based depth perception across the visual field. Building on our previous work on binocular disparity, we use a comparable experimental setup to isolate motion parallax as the sole depth cue and measure depth discrimination thresholds under varying levels of blur and eccentricity. Our initial results show that depth from motion is significantly impaired even by mild foveation, with stronger impairments at higher levels of blur. These findings suggest that motion-based depth cues may be more sensitive to foveated rendering than disparity cues, which we previously found to be largely unaffected in our earlier work. This research provides new insights into how different depth cues are affected by foveation and can guide the design of perceptually optimized foveation strategies for VR and AR applications.
+                Foveated rendering is a key technique for reducing computational load in immersive display systems by lowering rendered image quality in the peripheral visual field while preserving high fidelity in the fovea. While the impact of foveation on perceived spatial detail is well understood, its influence on other visual qualities, such as depth from motion parallax, remains unclear. In this work, we investigate how foveated rendering affects motion-based depth perception across the visual field. Building on previous work on binocular disparity, we use a comparable experimental setup to isolate motion parallax as the sole depth cue and measure depth discrimination thresholds under varying levels of foveation, modeled as varying intensities of spatial blur,  and eccentricity. 
+                Our results show that depth from motion is immediately impaired by visible foveation, with stronger impairments at higher levels of blur. These findings suggest that motion-based depth cues may be more sensitive to foveated rendering than disparity cues, which were previously found to be largely unaffected.
             </p>
         </div>
 
-        <!-- <div class="section">    
-            <h2>Video</h2>
-            <div class="video">
-                <iframe style="width:100%; aspect-ratio:16/9; height:auto;" src="https://www.youtube.com/embed/Mhe3IYm-hXE?si=SzKIxIkDrl7tyPI4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-            </div>
-        </div> -->
-        
+
+
     </div>
+
     <div class="color-bar" style="height:25vh"></div>
+
 </body>
 </html>
