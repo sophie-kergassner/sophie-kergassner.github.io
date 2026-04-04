@@ -2,6 +2,8 @@
     --highlight-color:rgb(221, 30, 12);
     --highlight-color-dark:rgb(136, 22, 12);
     --gray-light: #f0f0f0;
+    --gray-medium: #dadada;
+    --gray-dark: #bbb;
     --border-radius: 10px;
 }
 
@@ -38,7 +40,7 @@ a:hover{
 }
 
 .home-bar {
-    background-color: #f0f0f2;
+    background-color: var(--gray-light);
     display:flex; 
     align-items:flex-end;
     
@@ -50,7 +52,7 @@ a:hover{
     margin-left: calc(5% - 18px);
 }
 .home-bar .container-wide a{
-    color: #bbb;
+    color: var(--gray-dark);
     font-weight:400;
   }
 .home-bar .container-wide a:hover{
@@ -95,7 +97,7 @@ a:hover{
     align-items: center; 
     justify-content: center;
     border-radius: var(--border-radius);
-    background-color: #f0f0f2;
+    background-color: var(--gray-light);
     border: none;
     height: 40px;
     width: 100%;
@@ -107,7 +109,7 @@ a:hover{
 }
 
 .button-link:hover{
-    background-color: #dadada;
+    background-color: var(--gray-medium);
 }
 
 @media (max-width: 576px) {
