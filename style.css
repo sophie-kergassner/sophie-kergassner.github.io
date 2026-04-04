@@ -51,7 +51,7 @@ a:hover{
 }
 .home-bar .container-wide a{
     color: #bbb;
-    font-weight:600;
+    font-weight:400;
   }
 .home-bar .container-wide a:hover{
     color: var(--highlight-color);
