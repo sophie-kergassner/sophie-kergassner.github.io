@@ -30,12 +30,14 @@ const camera = new THREE.OrthographicCamera((frustumSize * aspect) / -2,
 camera.position.z = 3;
 
 // Renderer
-const renderer = new THREE.WebGLRenderer({ canvas });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
 function resizeRenderer() {
     const { width, height } = getRenderSize();
     const aspect = width / height;
 
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(width, height, false);
 
     camera.left = (-frustumSize * width / height) / 2;
@@ -57,6 +59,11 @@ controls.enableZoom = false;
 // Material for Object
 const textureLoader = new THREE.TextureLoader();
 const texture = textureLoader.load('/projects/depth-from-motion-and-disparity/texture.png');
+texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+texture.minFilter = THREE.LinearMipmapLinearFilter;
+texture.magFilter = THREE.LinearFilter;
+texture.generateMipmaps = true;
+texture.needsUpdate = true;
 
 const material = new THREE.MeshBasicMaterial({
     map: texture
