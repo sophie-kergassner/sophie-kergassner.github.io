@@ -143,6 +143,11 @@ canvas.addEventListener('pointerdown', () => {
     isPointerDown = true;
     beginContinuousInteraction();
 }, { passive: true });
+canvas.addEventListener('touchstart', () => {
+    dismissViewerOverlay();
+    isPointerDown = true;
+    beginContinuousInteraction();
+}, { passive: true });
 window.addEventListener('pointerup', () => {
     isPointerDown = false;
     endContinuousInteraction();
@@ -151,6 +156,14 @@ window.addEventListener('pointercancel', () => {
     isPointerDown = false;
     endContinuousInteraction();
 });
+window.addEventListener('touchend', () => {
+    isPointerDown = false;
+    endContinuousInteraction();
+}, { passive: true });
+window.addEventListener('touchcancel', () => {
+    isPointerDown = false;
+    endContinuousInteraction();
+}, { passive: true });
 
 
 // Cylinder
