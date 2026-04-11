@@ -1,0 +1,47 @@
+#viewer {
+    width: 100%;
+    position: relative;
+    margin: 0 auto;
+    display: grid;
+    place-items: center;
+}
+
+.viewer-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    color: var(--highlight-color);
+    font-size: clamp(0.9rem, 1.6vw, 1rem);
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 0.01em;
+    transition: opacity 220ms ease;
+    pointer-events: none;
+    padding-top: 12%;
+}
+
+.viewer-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-color: var(--gray-medium);
+    opacity: 0.80;
+}
+
+.viewer-overlay.is-hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+canvas {
+    width: min(100%, 50vh);
+    aspect-ratio: 1 / 1;
+    height: auto;
+    display: block;
+}

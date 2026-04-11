@@ -4,6 +4,72 @@ import { OBJLoader } from 'https://esm.sh/three@0.160.0/examples/jsm/loaders/OBJ
 
 const canvas = document.getElementById('c');
 const viewer = document.getElementById('viewer');
+const viewerOverlay = document.getElementById('viewer-overlay');
+
+function isOverlayVisible() {
+    return Boolean(viewerOverlay) && !viewerOverlay.classList.contains('is-hidden');
+}
+
+const INACTIVITY_TIMEOUT_MS = 5000;
+let inactivityTimerId = null;
+let isPointerDown = false;
+let isDraggingWithControls = false;
+
+function isActivelyInteracting() {
+    return isPointerDown || isDraggingWithControls;
+}
+
+function clearOverlayTimer() {
+    if (inactivityTimerId !== null) {
+        window.clearTimeout(inactivityTimerId);
+        inactivityTimerId = null;
+    }
+}
+
+function showViewerOverlay() {
+    if (!viewerOverlay) {
+        return;
+    }
+
+    viewerOverlay.classList.remove('is-hidden');
+}
+
+function dismissViewerOverlay() {
+    if (!viewerOverlay || viewerOverlay.classList.contains('is-hidden')) {
+        return;
+    }
+
+    viewerOverlay.classList.add('is-hidden');
+}
+
+function scheduleOverlayReturn() {
+    if (!viewerOverlay) {
+        return;
+    }
+
+    clearOverlayTimer();
+
+    inactivityTimerId = window.setTimeout(() => {
+        if (!isActivelyInteracting()) {
+            showViewerOverlay();
+        }
+    }, INACTIVITY_TIMEOUT_MS);
+}
+
+function handleTransientInteraction() {
+    dismissViewerOverlay();
+    scheduleOverlayReturn();
+}
+
+function beginContinuousInteraction() {
+    clearOverlayTimer();
+}
+
+function endContinuousInteraction() {
+    if (!isActivelyInteracting()) {
+        scheduleOverlayReturn();
+    }
+}
 
 function getRenderSize() {
     // Use actual on-screen canvas size so max-width and responsive CSS stay in sync.
@@ -58,6 +124,58 @@ controls.enableZoom = false;
 controls.rotateSpeed = 0.35;
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
+controls.autoRotate = isOverlayVisible();
+const overlayAutoRotateSpeed = 1.8;
+controls.autoRotateSpeed = overlayAutoRotateSpeed;
+
+
+
+controls.addEventListener('start', () => {
+    isDraggingWithControls = true;
+    beginContinuousInteraction();
+});
+controls.addEventListener('end', () => {
+    isDraggingWithControls = false;
+    endContinuousInteraction();
+});
+canvas.addEventListener('pointerdown', () => {
+    dismissViewerOverlay();
+    isPointerDown = true;
+    beginContinuousInteraction();
+}, { passive: true });
+window.addEventListener('pointerup', () => {
+    isPointerDown = false;
+    endContinuousInteraction();
+});
+window.addEventListener('pointercancel', () => {
+    isPointerDown = false;
+    endContinuousInteraction();
+});
+
+
+// Cylinder
+const geometry_cylinder = new THREE.CylinderGeometry(
+    0.05, // top radius
+    0.05, // bottom radius
+    2, // height
+    32 // radial segments (smoothness)
+);
+const material_cylinder = new THREE.MeshStandardMaterial({
+    color: 0x111111, // near-black (pure black can look flat/undefined)
+    roughness: 0.3, // MAX matte
+    metalness: 0.0 // no metallic shine
+});
+const cylinder = new THREE.Mesh(geometry_cylinder, material_cylinder);
+scene.add(cylinder);
+cylinder.rotation.set(Math.PI / 2, 0, 0); // Rotate the cylinder to lie flat on the XZ plane
+
+const geometry_sphere = new THREE.SphereGeometry(0.14, 32, 32);
+const sphere = new THREE.Mesh(geometry_sphere, material_cylinder);
+// sphere.position.set(0, 0, 0);
+sphere.scale.set(2,2,0.3);
+scene.add(sphere);
+
+
 
 // Material for Object
 const textureLoader = new THREE.TextureLoader();
@@ -72,20 +190,6 @@ const material = new THREE.MeshBasicMaterial({
     map: texture
 });
 
-const geometry_cylinder = new THREE.CylinderGeometry(
-    0.05, // top radius
-    0.05, // bottom radius
-    2, // height
-    32 // radial segments (smoothness)
-);
-const material_cylinder = new THREE.MeshStandardMaterial({
-    color: 0x111111, // near-black (pure black can look flat/undefined)
-    roughness: 0.5, // MAX matte
-    metalness: 0.0 // no metallic shine
-});
-const cylinder = new THREE.Mesh(geometry_cylinder, material_cylinder);
-scene.add(cylinder);
-cylinder.rotation.set(Math.PI / 2, 0, 0); // Rotate the cylinder to lie flat on the XZ plane
 
 // Load own object
 const loader = new OBJLoader();
@@ -124,7 +228,7 @@ loader.load(
 
 // Light
 const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(5, 5, 5);
+light.position.set(0, 0, 5);
 scene.add(light);
 
 // Animation loop
@@ -133,10 +237,27 @@ function animate() {
     // cube.rotation.x += 0.01;
     // cube.rotation.y += 0.01;
     // controls.minAzimuthAngle += 0.01 * -Math.PI / 12; // left 45°
+
+    const overlayVisible = isOverlayVisible();
+    controls.autoRotate = overlayVisible;
+
+    if (overlayVisible) {
+        const azimuth = controls.getAzimuthalAngle();
+        const epsilon = 0.001;
+        
+        if (azimuth >= controls.maxAzimuthAngle - epsilon) {
+            controls.autoRotateSpeed = Math.abs(overlayAutoRotateSpeed);
+        } else if (azimuth <= controls.minAzimuthAngle + epsilon) {
+            controls.autoRotateSpeed = -Math.abs(overlayAutoRotateSpeed);
+        }
+    }
+
     controls.update(); // required when damping is on
     renderer.render(scene, camera);
 }
 animate();
+
+scheduleOverlayReturn();
 
 // Resize handling
 window.addEventListener('resize', resizeRenderer);

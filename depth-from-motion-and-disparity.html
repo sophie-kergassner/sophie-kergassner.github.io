@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="projects.css">
+    <link rel="stylesheet" href="projects/depth-from-motion-and-disparity/style.css">
 
     <meta property="og:title" content="The Impact of Blur on Motion Parallax and Binocular Disparity" />
     <meta property="og:description" content="We examine the impact of blur on the perceived depth by motion parallax and evaluate the findings in comparison to our previous findings on the impact of blur on stereoacuity." />
@@ -17,7 +18,7 @@
 <style>
     :root {
         --highlight-color:#1b4a7d;
-        --highlight-color-dark:#072240;
+        --highlight-color-dark:#1b4a7d; /*072240*/
         --gray-light: #f3f9fd;
         --gray-medium: #e0ebf8;
         --gray-dark: #b6cbe4;
@@ -51,9 +52,12 @@
                 <span style="font-style: italic; font-size: 0.8em;">Università della Svizzera italiana</span>
             </p>
             
-            <p>
-                We examine the impact of blur on the perceived depth by motion parallax and evaluate the findings in comparison to our <a href="https://sophie-kergassner.github.io/depth-in-periphery.html">previous findings</a> on the impact of blur on stereoacuity.
-            </p>
+            <!-- <p> -->
+                <!-- While the impact of foveation on perceived spatial detail is well understood, its influence on other visual qualities, such as depth from motion parallax, remains unclear.
+                In this work, we investigate how foveated rendering affects motion-based depth perception across the visual field.
+                Building on <a href="https://sophie-kergassner.github.io/depth-in-periphery.html">previous work</a> on binocular disparity, we use a comparable experimental setup to isolate motion parallax as the sole depth cue and measure depth discrimination thresholds under varying levels of foveation, modeled as varying intensities of spatial blur, and eccentricity. -->
+                <!-- We examine the impact of blur on the perceived depth by motion parallax and evaluate the findings in comparison to our <a href="https://sophie-kergassner.github.io/depth-in-periphery.html">previous findings</a> on the impact of blur on stereoacuity. -->
+            <!-- </p> -->
 
 
 
@@ -78,10 +82,9 @@
             <!-- <iframe src="https://www.desmos.com/3d/04pcnb63cj" width="100%" style="min-height:60vh"></iframe> -->
 
             <div class="container-wide">
-            
-            <img src="projects/depth-from-motion-and-disparity/teaser.jpg">
+                <img src="projects/depth-from-motion-and-disparity/teaser.jpg">
                 <p>
-                    <span style="font-weight: bold;">Teaser:</span> 
+                    <!-- <span style="font-weight: bold;">Teaser:</span>  -->
                     Perceptual models of depth from binocular disparity (left) and motion parallax (right) under increasing peripheral blur.
                     The red curves indicate the maximum blur that does not impair depth perception, while the white curves mark the threshold at which blur becomes perceptible.
                     A larger gap between these curves reflects greater robustness to blur.
@@ -93,40 +96,59 @@
 
 
         <div class="section">
-            <h2>Abstract</h2>
+            <h2>Overview</h2>
             <p>
-                Foveated rendering is a key technique for reducing computational load in immersive display systems by lowering rendered image quality in the peripheral visual field while preserving high fidelity in the fovea. While the impact of foveation on perceived spatial detail is well understood, its influence on other visual qualities, such as depth from motion parallax, remains unclear. In this work, we investigate how foveated rendering affects motion-based depth perception across the visual field. Building on previous work on binocular disparity, we use a comparable experimental setup to isolate motion parallax as the sole depth cue and measure depth discrimination thresholds under varying levels of foveation, modeled as varying intensities of spatial blur,  and eccentricity. 
-                Our results show that depth from motion is immediately impaired by visible foveation, with stronger impairments at higher levels of blur. These findings suggest that motion-based depth cues may be more sensitive to foveated rendering than disparity cues, which were previously found to be largely unaffected.
+                While the impact of foveation on perceived spatial detail is well understood, its influence on other visual qualities, such as the perception of depth, remains unclear.
+                In this work, we investigate how foveated rendering affects motion-based depth perception across the visual field.
+                Building on 
+                <a class="text-link" href="depth-in-periphery.html">
+                    <svg width="16" height="12" viewBox="7 -2 16 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>previous workon binocular disparity</a>, 
+                we use a comparable experimental setup to isolate motion parallax as the sole depth cue and measure depth discrimination thresholds under varying levels of foveation, modeled as varying intensities of spatial blur, and eccentricity.
+                <!-- Foveated rendering is a key technique for reducing computational load in immersive display systems by lowering rendered image quality in the peripheral visual field while preserving high fidelity in the fovea. While the impact of foveation on perceived spatial detail is well understood, its influence on other visual qualities, such as depth from motion parallax, remains unclear. In this work, we investigate how foveated rendering affects motion-based depth perception across the visual field. Building on previous work on binocular disparity, we use a comparable experimental setup to isolate motion parallax as the sole depth cue and measure depth discrimination thresholds under varying levels of foveation, modeled as varying intensities of spatial blur,  and eccentricity. 
+                Our results show that depth from motion is immediately impaired by visible foveation, with stronger impairments at higher levels of blur. These findings suggest that motion-based depth cues may be more sensitive to foveated rendering than disparity cues, which were previously found to be largely unaffected. -->
             </p>
         </div>
+
+
 
         <div class="section">
-            <h2>Stimulus</h2>
+            <h2>Experimental Setup</h2>
             <p>
-                Move the stimulus with the mouse to experience depth from motion parallax.  
+                We aim to examine the influence of spatial blur on the perceived depth from motion parallax across a range of eccentricities. We design our study to extend the perceptual model proposed in 
+                <a class="text-link" href="depth-in-periphery.html">
+                    <svg width="16" height="12" viewBox="7 -2 16 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>our previous project,
+                </a> 
+                where we examined the impact of foveation on stereoacuity. In that interest, our goal is to stay as close as possible to the original experimental paradigm, to achieve numerical comparability between the two models.
             </p>
-            <div id="viewer">
-                <canvas id="c"></canvas>
+            <div class="container-wide">
+                <div id="viewer">
+                    <div id="viewer-overlay" class="viewer-overlay">
+                        Click here and move the object to <br> experience motion parallax.
+                    </div>
+                    <canvas id="c"></canvas>
+                </div>
+                <p>
+                    Participants observe a monoscopic representation of the ring. The observer’s movement is directly linked to the perspective from which the stimulus is rendered. Thus, by moving their head, participants perceive different monoscopic views of the stimulus that are consistent with their position in space.
+                    The shaded geometric elements in the center provide shading cues that help maintain orientation during movement.
+                    <!-- In the experiment, participants could perceive different perspectives of the stimulus  -->
+                </p>
             </div>
         </div>
-
-
-        <style>
-            #viewer {
-                width: 100%;
-                max-width: 50vh;
-                aspect-ratio: 1/1;
-                position: relative;
-                margin: 0 auto;
-                }
-                canvas {
-                    width: 100%;
-                    height: 100%;
-                display: block;
-                }
-        </style>
         <script type="module" src="projects/depth-from-motion-and-disparity/viewer.js"></script>
         
+
+
+        <!-- <div class="section">
+            <h2>Data Evaluation and Results</h2>
+            <p>
+                We aim to examine the influence of spatial blur on the perceived depth from motion parallax across a range of eccentricities. We design our study to extend the perceptual model proposed in 
+                <a class="text-link" href="depth-in-periphery.html">
+                    <svg width="16" height="12" viewBox="7 -2 16 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>our previous project,
+                </a> 
+                where we examined the impact of foveation on stereoacuity. In that interest, our goal is to stay as close as possible to the original experimental paradigm, to achieve numerical comparability between the two models.
+            </p>
+            </div> -->
+
         <div class="section">
             <h2>Acknowledgements</h2>
             <p>
