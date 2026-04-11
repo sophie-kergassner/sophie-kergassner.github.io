@@ -55,6 +55,9 @@ controls.maxPolarAngle = Math.PI / 2 + Math.PI / 12; // 45° down
 controls.minAzimuthAngle = -Math.PI / 12; // left 45°
 controls.maxAzimuthAngle = Math.PI / 12; // right 45°
 controls.enableZoom = false;
+controls.rotateSpeed = 0.35;
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
 
 // Material for Object
 const textureLoader = new THREE.TextureLoader();
