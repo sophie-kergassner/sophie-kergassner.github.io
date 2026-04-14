@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="projects.css">
+
+    <meta property="og:title" content="Towards Understanding Depth Perception in Foveated Rendering" />
+    <meta property="og:description" content="We demonstrate that stereoacuity is remarkably resilient to foveated rendering and remains unaffected with up to 2× stronger foveation than commonly used. To this end, we design a psychovisual experiment and derive a simple perceptual model that determines the amount of foveation that does not affect stereoacuity." />
+    <meta property="og:image" content="https://sophie-kergassner.github.io/projects/depth-in-periphery/website-preview.jpg" />
+    <meta property="og:url" content="https://sophie-kergassner.github.io/projects/depth-in-periphery" />
+    <meta property="og:type" content="website" />
+</head>
+
+<style>
+    :root {
+        --highlight-color:#bf0c4c;
+        --highlight-color-dark:#6e072c; /*072240*/
+        --gray-light: #f1efe3;
+        --gray-medium: #ede8dc;
+        --gray-dark: #d2c5b2;
+    }
+</style>
+
+<body>
+
+    <div class="home-bar"> 
+        <div class="container-wide"> 
+            <a href="index.html">
+                <svg width="18" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12H3M3 12l6-6M3 12l6 6" /></svg>Home
+            </a>
+        </div>
+    </div>
+
+
+
+    <div class="container">
+        
+        <div class="section">
+            <h3>
+                ACM SIGGRAPH Conference Papers&nbsp;'26
+            </h3>
+            <h1>
+                Towards Understanding Depth Perception in Foveated Rendering
+            </h1>
+            
+            <p class="publication-authors">
+                <span class="author-highlight"><a href="https://sophie-kergassner.github.io">Sophie Kergaßner</a></span>,
+                <a href="https://www.pdf.inf.usi.ch/people/piotr/">Piotr Didyk</a><br>
+                <span style="font-style: italic; font-size: 0.8em;">Università della Svizzera italiana</span>
+            </p>
+            
+            <p>
+                We present a method for enhancing the perceived quality of foveated images by extrapolating local image statistics, such as intensity, orientation and especially phase, from coarse to fine scales. In particular, we demonstrate that correct phase alignment across space and scales is crucial for achieving perceptually convincing image quality.
+            </p>
+
+            <div class="button-container">
+                <a class="button-link" href="https://arxiv.org/pdf/2601.19425" target="_blank" >
+                    <svg width="18" height="12" viewBox="9 0 18 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
+                    Paper (14MB)
+                </a>
+                <a class="button-link" href="https://arxiv.org/abs/2601.19425" target="_blank" > 
+                    <svg width="18" height="12" viewBox="9 0 18 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
+                    Arxiv
+                </a>
+                <!-- <a class="button-link" href="https://www.pdf.inf.usi.ch/projects/DepthInPeriphery/poster.pdf" target="_blank" > 
+                    <svg width="18" height="12" viewBox="9 0 18 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
+                    Poster
+                </a> -->
+                <a class="button-link" href="https://www.pdf.inf.usi.ch" target="_blank" >    
+                    <svg width="18" height="12" viewBox="9 0 18 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
+                    Group Page
+                </a>
+            </div>
+
+            <div class="container-wide">
+                <img src="projects/phase-aligned-metamers/teaser-all_same.jpg">
+                    <!-- <p>
+                        <span style="font-weight: bold;">Teaser:</span> We design a broadband stimulus to accurately estimate disparity thresholds across various eccentricities and blur levels. We fit a custom surface through the retrieved threshold estimations. It shows the lowest resolvable disparity 𝑇 as a continuous function of eccentricity 𝜃 and Gaussian filter sigma 𝜎. The green line denotes the minimum 𝑇-value per eccentricity 𝜃 , encoding the amount of blur that can be induced by foveated rendering without degrading stereoscopic depth perception. We validate our findings in a validation study, by showing participants unaltered renderings vs. strongly foveated renderings.
+                    </p> -->
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Abstract</h2>
+            <p>
+                Novel display technologies can deliver high-quality images across a wide field of view, creating immersive experiences. While rendering for such devices is expensive, most of the content falls into peripheral vision, where human perception differs from that in the fovea. Consequently, it is critical to understand and leverage the limitations of visual perception to enable efficient rendering. A standard approach is to exploit the reduced sensitivity to spatial details in the periphery by reducing rendering resolution, so-called foveated rendering. While this strategy avoids rendering part of the content altogether, an alternative promising direction is to replace accurate and expensive rendering with inexpensive synthesis of content that is perceptually indistinguishable from the ground-truth image. In this paper, we propose such a method for the efficient generation of an image signal that substitutes the rendering of high-frequency details. The method is grounded in findings from image statistics, which show that preserving appropriate local statistics is critical for perceived image quality. Based on this insight, we extrapolate several local image statistics from foveated content into higher spatial frequency ranges that are attenuated or omitted in the rendering process. This rich set of statistics is later used to synthesize a signal that is added to the initial rendering, boosting its perceived quality. We focus on phase information, demonstrating the importance of its alignment across space and frequencies. We calibrate and compare our method with state-of-the-art strategies, showing a significant reduction in the content that must be accurately rendered at a relatively small extra cost for synthesizing the additional signal.
+            </p>
+        </div>
+    </div>
+
+    <div class="color-bar" style="height:25vh"></div>
+    
+</body>
+</html>
