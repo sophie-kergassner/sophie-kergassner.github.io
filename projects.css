@@ -5,7 +5,7 @@ h1 {
 
 h3{
     margin: 0;
-    color: #bbb;
+    color: var(--gray-dark);
 }
 
 sup{
