@@ -49,25 +49,34 @@ canvas {
 
 
 .results-grid-three {
-        --results-gap: 16px;
-        --results-min: 200px;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(var(--results-min), 1fr));
-        gap: var(--results-gap);
-        align-items: flex-start;
-        container-type: inline-size;
-    }
+    --results-gap: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--results-gap);
+    justify-content: center;
+    align-items: flex-start;
+}
 
+.results-grid-three img {
+    flex: 0 1 calc((100% - (2 * var(--results-gap))) / 3);
+    max-width: calc((100% - (2 * var(--results-gap))) / 3);
+    width: calc((100% - (2 * var(--results-gap))) / 3);
+    height: auto;
+    display: block;
+}
+
+@media (max-width: 760px) {
     .results-grid-three img {
-        width: 100%;
-        height: auto;
-        display: block;
+        flex-basis: calc((100% - var(--results-gap)) / 2);
+        max-width: calc((100% - var(--results-gap)) / 2);
+        width: calc((100% - var(--results-gap)) / 2);
     }
+}
 
-    @container (min-width: calc(2 * 200px + 16px)) and (max-width: calc(3 * 200px + 2 * 16px - 0.02px)) {
-    .results-grid-three img:last-child:nth-child(odd) {
-        grid-column: 1 / -1;
-        width: calc((100% - 16px) / 2);
-        justify-self: center;
+@media (max-width: 460px) {
+    .results-grid-three img {
+        flex-basis: 100%;
+        max-width: 100%;
+        width: 100%;
     }
 }
