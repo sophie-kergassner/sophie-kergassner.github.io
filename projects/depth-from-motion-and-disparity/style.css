@@ -45,3 +45,23 @@ canvas {
     height: auto;
     display: block;
 }
+
+
+.results-grid-three {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 16px;
+    align-items: start;
+}
+
+.results-grid-three img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+@media (max-width: 600px) {
+    .results-grid-three {
+        grid-template-columns: 1fr;
+    }
+}
