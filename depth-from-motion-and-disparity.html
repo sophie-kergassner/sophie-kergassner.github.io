@@ -31,6 +31,30 @@
         display: inline-block;
         vertical-align: -0.12em;
     }
+
+    .results-grid-three {
+        --results-gap: 16px;
+        --results-min: 200px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(var(--results-min), 1fr));
+        gap: var(--results-gap);
+        align-items: flex-start;
+        container-type: inline-size;
+    }
+
+    .results-grid-three img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    @container (min-width: calc(2 * 200px + 16px)) and (max-width: calc(3 * 200px + 2 * 16px - 0.02px)) {
+    .results-grid-three img:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+        width: calc((100% - 16px) / 2);
+        justify-self: center;
+    }
+}
 </style>
 
 <body>
