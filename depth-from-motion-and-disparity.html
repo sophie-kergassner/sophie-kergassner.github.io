@@ -23,6 +23,13 @@
         --gray-medium: #e0ebf8;
         --gray-dark: #b6cbe4;
     }
+
+    .inline-icon {
+        width: 1.2em;
+        height: 1.2em;
+        display: inline-block;
+        vertical-align: -0.12em;
+    }
 </style>
 
 <body>
@@ -50,6 +57,10 @@
                 <span class="author-highlight"><a href="https://sophie-kergassner.github.io">Sophie Kergaßner</a></span>,
                 <a href="https://www.pdf.inf.usi.ch/people/piotr/">Piotr Didyk</a><br>
                 <span style="font-style: italic; font-size: 0.8em;">Università della Svizzera italiana</span>
+            </p>
+
+            <p>
+                <img class="inline-icon" src="projects/depth-from-motion-and-disparity/medal_HVEI26.svg"> We won the <span style="color: var(--highlight-color);">Best Student Paper Award</span> of Electronic Imaging 2026 for this research and are happy about the positive reception! <!--&#x1F4AB;&#x1F483; -->
             </p>
             
             <p> 
@@ -85,16 +96,15 @@
 
             <!-- <iframe src="https://www.desmos.com/3d/04pcnb63cj" width="100%" style="min-height:60vh"></iframe> -->
 
-            <div class="container-wide">
+            <!-- <div class="container-wide">
                 <img src="projects/depth-from-motion-and-disparity/teaser.jpg">
                 <p>
-                    <!-- <span style="font-weight: bold;">Teaser:</span>  -->
                     Perceptual models of depth from binocular disparity (left) and motion parallax (right) under increasing peripheral blur.
                     The red curves indicate the maximum blur that does not impair depth perception, while the white curves mark the threshold at which blur becomes perceptible.
                     A larger gap between these curves reflects greater robustness to blur.
                     While disparity remains stable far beyond the visibility threshold, motion parallax degrades as soon as blur becomes perceptible, leaving little margin for aggressive foveation.   
                 </p>
-            </div>
+            </div> -->
         </div>
 
 
@@ -138,31 +148,61 @@
         </div>
         <script type="module" src="projects/depth-from-motion-and-disparity/viewer.js"></script>
         
-        <!-- <div class="section">
-            <h2>Findings</h2>
+        <div class="section">
+            <h2>Results</h2>
             <p>
-                We find that depth perception from motion parallax remains surprisingly robust even under strong peripheral blur. While sensitivity decreases with eccentricity, the effect is gradual and follows consistent trends across the visual field. This suggests that reliable depth perception is still possible in the periphery, even with heavily foveated content.
+                We evaluate our experimental data by fitting a perceptual model to the measured depth discrimination thresholds. The model describes depth discrimination thresholds as a function of eccentricity and blur intensity. We find the final fit by fitting a softplus function to our three measured eccentricites, and interpolating between them.
             </p>
-            <p>
-                Comparing to our previous model on binocular disparity, both cues exhibit similar qualitative behavior across eccentricity and blur levels. However, depth from disparity degrades more rapidly under increasing blur, whereas motion parallax remains more stable. This highlights differences in how the visual system relies on these cues in foveated conditions.
-            </p>
-        </div> -->
 
-        <!-- <div class="section">
-            <h2>Motion Parallax vs. Binocular Disparity</h2>
+            <div class="container-wide">
+                <img src="projects/depth-from-motion-and-disparity/data-fits.svg">
+                <p>
+                    Measured thresholds for the three examined eccentricities 0◦, 10◦, and 20◦. The individual points display the bootstrapped mean thresholds per participant and condition, with the area denoting the weight w. The diamonds display the weighted average per blur intensity, as well as the standard error.
+                </p>
+            </div>
+
+
+            <!-- <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script> -->
+            <!-- <p>
+                To make the model more accessible, we also provide an interactive visualization. You can explore how perceived depth changes with different parameters in this Desmos plot: [link]. We additionally include a 3D visualization that illustrates the combined effects of eccentricity and blur on depth sensitivity, helping to build intuition for the model behavior.
+            </p> -->
+            <!-- <p>
+                We find that depth perception from motion parallax remains surprisingly robust even under strong peripheral blur. While overall sensitivity decreases with eccentricity, the effect is gradual and follows consistent trends across the visual field. This suggests that reliable depth perception is still possible in the periphery, even with heavily foveated content.
+            </p> -->
             
-        </div> -->
+        </div>
 
-        <!-- <div class="section">
-            <h2>Data Evaluation and Results</h2>
+        <div class="section">
+            <h2>Motion Parallax vs. Binocular Disparity</h2>
             <p>
-                We aim to examine the influence of spatial blur on the perceived depth from motion parallax across a range of eccentricities. We design our study to extend the perceptual model proposed in 
-                <a class="text-link" href="depth-in-periphery.html">
-                    <svg width="16" height="12" viewBox="7 -2 16 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>our previous project,
-                </a> 
-                where we examined the impact of foveation on stereoacuity. In that interest, our goal is to stay as close as possible to the original experimental paradigm, to achieve numerical comparability between the two models.
+                Under comparable conditions, we find clear differences between the two depth cues. Depth from motion parallax requires larger depth differences to be perceived, and is therefore less precise than binocular disparity. While disparity remains surprisingly robust even under clearly visible blur, motion parallax is much more sensitive: performance stays stable only while blur is below the visibility threshold, and drops off quickly once it becomes noticeable. This indicates that motion-based depth cues operate close to their limits under typical foveation settings.
             </p>
-            </div> -->
+            <div class="container-wide">
+                <img src="projects/depth-from-motion-and-disparity/teaser.jpg">
+                <p>
+                    Perceptual models of depth from binocular disparity (left) and motion parallax (right) under increasing peripheral blur.
+                    The red curves indicate the maximum blur that does not impair depth perception, while the white curves mark the threshold at which blur becomes perceptible.
+                    A larger gap between these curves reflects greater robustness to blur.
+                    While disparity remains stable far beyond the visibility threshold, motion parallax degrades as soon as blur becomes perceptible, leaving little margin for aggressive foveation.   
+                </p>
+            </div>
+        </div>
+
+        <div class="section">    
+            <h2>BibTeX</h2>
+            <div class="bib" role="table" aria-label="BibTeX entry">
+                <div class="row" role="row"><span role="cell"><< Waiting for DOI. >></span></div>
+                <!-- <div class="row" role="row"><span role="cell" class="bib-key">author</span><span role="cell">=</span><span role="cell">{Kerga\ss{}ner, Sophie and Didyk, Piotr},</span></div>
+                <div class="row" role="row"><span class="bib-key">title</span><span>=</span><span>{The Impact of Blur on Motion Parallax and Binocular Disparity},</span></div>
+                <div class="row" role="row"><span class="bib-key">year</span><span>=</span><span>{2026},</span></div>
+                <div class="row" role="row"><span class="bib-key">doi</span><span>=</span><span>{ << MISSING >> },</span></div>
+                <div class="row" role="row"><span class="bib-key">articleno</span><span>=</span><span>{ << MISSING >> },</span></div>
+                <div class="row" role="row"><span class="bib-key">numpages</span><span>=</span><span>{6},</span></div>
+                <div class="row" role="row"><span>}</span></div> -->
+            </div>
+
+
+        </div>
 
         <div class="section">
             <h2>Acknowledgements</h2>
