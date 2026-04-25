@@ -25,17 +25,17 @@ sup{
 .container-wide{
     max-width: 1200px;
     /* background-color: var(--gray-light); */
-    border-radius: var(--border-radius);
+    /* border-radius: var(--border-radius); */
     margin: 64px 0;
 }
 
-.container-wide img {
+.container-wide img, .img-container img {
     max-width: 900px;
     margin: 16px auto;
     display: block;
     width: 100%;
 }
-.container-wide p{
+.container-wide p, .img-container p {
     max-width: 900px;
     margin: 16px auto;   
     font-size: 0.8em;
