@@ -52,7 +52,7 @@ a:hover{
     margin-left: calc(5% - 18px);
 }
 .home-bar .container-wide a{
-    color: var(--gray-dark);
+    color: var(--highlight-color);
     font-weight:400;
     font-size: 0.8em;
   }
@@ -62,16 +62,6 @@ a:hover{
 .home-bar a svg {
     display: inline;
 }
-
-.home-arrow {
-  width: 18px;
-  height: 10px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  vertical-align: -0.08em;
-}
-
 @media (max-width: 1000px) {
 .home-bar a svg {
     display: none;
