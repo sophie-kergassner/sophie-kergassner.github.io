@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="projects.css">
+    <link rel="stylesheet" href="projects/phase-aligned-metamers/phase-aligned-metamers-style.css">
 
     <meta property="og:title" content="Towards Understanding Depth Perception in Foveated Rendering" />
     <meta property="og:description" content="We demonstrate that stereoacuity is remarkably resilient to foveated rendering and remains unaffected with up to 2× stronger foveation than commonly used. To this end, we design a psychovisual experiment and derive a simple perceptual model that determines the amount of foveation that does not affect stereoacuity." />
@@ -89,9 +90,90 @@
                 Novel display technologies can deliver high-quality images across a wide field of view, creating immersive experiences. While rendering for such devices is expensive, most of the content falls into peripheral vision, where human perception differs from that in the fovea. Consequently, it is critical to understand and leverage the limitations of visual perception to enable efficient rendering. A standard approach is to exploit the reduced sensitivity to spatial details in the periphery by reducing rendering resolution, so-called foveated rendering. While this strategy avoids rendering part of the content altogether, an alternative promising direction is to replace accurate and expensive rendering with inexpensive synthesis of content that is perceptually indistinguishable from the ground-truth image. In this paper, we propose such a method for the efficient generation of an image signal that substitutes the rendering of high-frequency details. The method is grounded in findings from image statistics, which show that preserving appropriate local statistics is critical for perceived image quality. Based on this insight, we extrapolate several local image statistics from foveated content into higher spatial frequency ranges that are attenuated or omitted in the rendering process. This rich set of statistics is later used to synthesize a signal that is added to the initial rendering, boosting its perceived quality. We focus on phase information, demonstrating the importance of its alignment across space and frequencies. We calibrate and compare our method with state-of-the-art strategies, showing a significant reduction in the content that must be accurately rendered at a relatively small extra cost for synthesizing the additional signal.
             </p>
         </div>
+    
+
+
+        <div class="section">
+            <h2>Effect of Parameters</h2>
+            <p>
+                The image below shows a foveated image with an enhanced luminance channel.
+                In this particular example, the enhancement is synthesized based on image parameters that were extracted from the groundtruth image, so the enhancement is as close as possible to the real difference between the foveated image and the original image.
+                Adjust the sliders to influence how accurately the three parameters are resembled in the synthesized noise. The orange dot marks the gaze point.
+            </p>
+            
+
+
+            <div class="viewer">
+                <img id="demoImage" src="projects/phase-aligned-metamers/tree_1024x512/tree_intensity-1.0_dir-1.0_phase-1.0.jpg">
+            </div>
+<div class="controls">
+                <label>
+                    
+                    <input type="range" id="intensity" min="0" max="1" step="0.2" value="1">
+                    Intensity
+                </label>
+
+                <label>
+                    <input type="range" id="orientation" min="0" max="1" step="0.2" value="1">
+                    Orientation
+                </label>
+
+                <label>
+                    <input type="range" id="phase" min="0" max="1" step="0.2" value="1">
+                    Phase
+                </label>
+
+                <button id="noiseToggleBtn" class="toggle-button" aria-pressed="false" type="button">
+                    Show Just Noise
+                </button>
+            </div>  
+            
+        </div>
+
+
     </div>
+
 
     <div class="color-bar" style="height:25vh"></div>
     
+
+
+
+    <script>
+
+        const img = document.getElementById("demoImage");
+
+        const intensity = document.getElementById("intensity");
+        const orientation = document.getElementById("orientation");
+        const phase = document.getElementById("phase");
+        const noiseToggleBtn = document.getElementById("noiseToggleBtn");
+        let noiseActive = false;
+
+        function updateImage() {
+        const percentIntensity = Number(intensity.value).toFixed(1);
+        const percentDir = Number(orientation.value).toFixed(1);
+        const percentPhase = Number(phase.value).toFixed(1);
+        const noiseSuffix = noiseActive ? "_noise" : "";
+
+        const file =
+            `projects/phase-aligned-metamers/tree_1024x512/tree${noiseSuffix}_intensity-${percentIntensity}` +
+            `_dir-${percentDir}` +
+            `_phase-${percentPhase}.jpg`;
+
+        img.src = file;
+        
+        }
+        [intensity, orientation, phase].forEach(slider => {
+            slider.addEventListener("input", updateImage);
+        });
+        noiseToggleBtn.addEventListener("click", () => {
+            noiseActive = !noiseActive;
+            noiseToggleBtn.classList.toggle('active', noiseActive);
+            noiseToggleBtn.setAttribute('aria-pressed', noiseActive ? 'true' : 'false');
+            updateImage();
+        });
+    </script>
+
+
 </body>
 </html>
