@@ -50,13 +50,14 @@ sup{
     border-radius: var(--border-radius);
     padding:16px 20px;
     color: #555;
+    overflow-x: auto;
 }
 .bib .row {
     display:grid;
     grid-template-columns: max-content max-content 1fr; /* key | = | value */
     column-gap: 8px;
-    white-space: pre-wrap;          /* preserve line breaks & allow wrapping */
-    overflow-wrap: anywhere;        /* break long tokens if needed */
+    white-space: nowrap;            /* keep each BibTeX row on one line */
+    overflow-wrap: normal;
     /* margin: 2px 0; */
 }
 .bib-key { 
