@@ -360,7 +360,7 @@ p {
 }
 
 .publication-title a {
-    font-size: 0.98rem;
+    font-size: 16px;
     color: var(--card-accent-dark);
 }
 
