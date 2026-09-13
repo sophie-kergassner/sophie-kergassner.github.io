@@ -192,6 +192,7 @@ h1{
     line-height: 1.083;
     font-weight: 700;
     margin: 0;
+    margin-bottom: 16px;
     color: var(--highlight-color);
 }
 h2{
@@ -449,19 +450,35 @@ p {
     --card-border: #c9edeb;
 }
 
-.publication--somnium {
-    --card-accent: #007783;
-    --card-accent-dark: #007783;
-    --card-surface: #eff9f9;
-    --card-border: #cfe6e6;
-}
-
 .publication--hivefive {
   --card-accent: #f2a33a;
   --card-accent-dark: #c97c00;
   --card-surface: #fff7f0;
   --card-border: #fff7f0;
 }
+
+.publication--flippyphos {
+    --card-accent: #CD9F5F;
+    --card-accent-dark: #2E5278;
+    --card-surface: #F2EEE7;
+    --card-border: #F2EEE7;
+}
+
+.publication--somnium {
+    --card-accent: #7292F6;
+    --card-accent-dark: #455BB9;
+    --card-surface: #EEF2FF;
+    --card-border: #EEF2FF;
+}
+
+.publication--genesis {
+  --card-accent: #B195A0;
+  --card-accent-dark: #72545D;
+  --card-surface: #FDF8F8;
+  --card-border: #FDF8F8;
+}
+
+
 
 @media (max-width: 680px) {
   .publication {
