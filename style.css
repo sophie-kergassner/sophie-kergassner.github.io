@@ -257,6 +257,10 @@ p {
     display: block;
 }
 
+.headline-name .publication-pill{
+    margin-top: 8px;
+}
+
 .headline-text-narrow {
     display:none
 }
