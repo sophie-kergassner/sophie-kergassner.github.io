@@ -534,8 +534,8 @@ p {
 } */
 
 .news-pill {
-  display: inline-block;
-  padding: 0 0.6em;
+  /* display: inline-block; */
+  padding: 0.1em 0.6em;
   border-radius: var(--border-radius);
   background: var(--news-pill-bg, var(--card-surface));
   color: var(--news-pill-color, var(--card-accent));
