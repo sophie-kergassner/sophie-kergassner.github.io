@@ -481,6 +481,7 @@ p {
 
 
 @media (max-width: 680px) {
+
   .publication {
     flex-direction: column;
   }
@@ -503,8 +504,8 @@ p {
 
 .news-table > .row {
   display: grid;
-  grid-template-columns: 44px 36px 1fr;
-  gap: 10px;
+  grid-template-columns: 54px 46px 1fr;
+  gap: 0px;
   align-items: start;
 }
 
@@ -572,6 +573,12 @@ p {
   color: inherit;
   font-weight: 700;
 }
+@media (max-width: 500px) {
+    .news-table > .row {
+  grid-template-columns: 44px 36px 1fr;
+}
+}
+
 
 @media (max-width: 576px) {
   .container {
@@ -591,5 +598,6 @@ p {
   .home-bar .container-wide a{
     color: #fff;
   }
+
 }
 
