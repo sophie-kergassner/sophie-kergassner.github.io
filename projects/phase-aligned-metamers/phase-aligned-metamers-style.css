@@ -29,28 +29,6 @@
     margin-top: 4px;
 }
 
-/* Toggle button for noise */
-.toggle-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 16px;
-    height:40px;
-    background: var(--gray-light);
-    border: 0px solid var(--gray-dark);
-    border-radius: 6px;
-    color: var(--highlight-color);
-    cursor: pointer;
-    font: inherit;
-}
-
-.toggle-button.active {
-    background: var(--highlight-color);
-    color: white;
-    border-color: var(--highlight-color-dark);
-}
-
-
 .controls input[type="range"] {
     width: 100%;
     box-sizing: border-box;
@@ -99,45 +77,6 @@
 
 .controls input[type="range"]:focus {
     outline: none;
-}
-
-.viewer {
-    width: 100%;
-    aspect-ratio: 1072 / 560;
-    background: var(--gray-light);
-    overflow: hidden;
-    position: relative;
-    border-radius: 8px;
-}
-
-.viewer img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    display: block;
-    position: relative;
-    z-index: 1;
-}
-
-.viewer::after {
-    content: "";
-    position: absolute;
-    left: 5.2%;
-    bottom: 10%;
-    width: 1.5%;
-    min-width: 4px;
-    aspect-ratio: 1 / 1;
-    background: #de8400;
-    border-radius: 50%;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-    pointer-events: none;
-    z-index: 2;
-    border: 2px solid rgba(255,255,255,0.35);
-}
-
-
-#demo-img {
-    border-radius: var(--border-radius);
 }
 
 /* ------------------------------------------------------------------ Real-Time Demo (WebGPU)
@@ -251,8 +190,6 @@
     background: var(--gray-light);
     color: #4f4f55;
 }
-.pam-demo .pam-check { flex-direction: row; align-items: center; color: #4f4f55; }
-.pam-demo .pam-check input { accent-color: var(--highlight-color); }
 
 .pam-demo .pam-status #status.error { color: var(--highlight-color); font-weight: 700; }   /* status: first line of the credits */
 .pam-demo [hidden] { display: none !important; }
@@ -260,17 +197,6 @@
 
 .pam-demo .pam-fitplot { margin-top: 16px; color: #4f4f55; }
 .pam-demo .pam-fit-caption { font-size: 0.75em; color: #aaa; margin-top: 2px; }
-
-.pam-demo .pam-thumbs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
-.pam-demo .pam-thumb { font: inherit; font-size: 0.75em; padding: 0; border: 2px solid transparent; border-radius: 6px; background: var(--gray-light); color: #4f4f55; cursor: pointer; text-align: left; overflow: hidden; }
-.pam-demo .pam-thumb.on { border-color: var(--highlight-color); }
-.pam-demo .pam-thumb, .pam-demo .pam-thumb canvas { cursor: pointer; }
-.pam-demo .pam-thumb:hover:not(.on) { border-color: var(--gray-dark); }
-.pam-demo .pam-thumb:hover span { color: var(--highlight-color); }
-.pam-demo .pam-thumb canvas { display: block; width: 100%; }
-.pam-demo .pam-thumb span { display: block; padding: 2px 6px; }
-
-.pam-demo .pam-info { cursor: help; opacity: 0.6; }
 .pam-demo .pam-canvas:fullscreen { display: flex; align-items: center; justify-content: center; border-radius: 0; background: #000; }
 .pam-demo input[type="number"] { font: inherit; width: 64px; padding: 4px 6px; border: 0; border-radius: 6px; background: var(--gray-light); color: #4f4f55; }
 .pam-demo .pam-keep { display: contents; }
@@ -285,8 +211,6 @@
 .pam-demo .pam-levels { left: auto; right: 10px; }
 .pam-demo .pam-setup { font-size: 0.7em; color: var(--gray-darker, #878787); align-items: center; gap: 12px 24px;
                        margin-top: 16px; padding: 12px 0 0; border-top: 1px solid var(--gray-medium); }
-.pam-demo .pam-setup-note { grid-column: 1 / -1; margin: 0; font-size: 1.339em; line-height: 1.4; color: #888; }   /* inside .pam-setup (0.8 x 0.7 = 0.56em): 1.339 x 0.56 = 0.75em, same as the other notes */
-.pam-demo .pam-setup-title { font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
 .pam-demo .pam-setup input[type="number"] { width: 56px; color: var(--gray-darker, #878787); }
 .pam-demo .pam-note { font-size: 0.75em; line-height: 1.4; color: #4f4f55; margin: 16px 0 0; }
 /* fill sliders: the range input drawn as a button that fills from the left (crimson), its label on top;
@@ -341,7 +265,6 @@
 .pam-demo .pam-setup .pam-fill-text { color: var(--gray-darker, #878787); }
 .pam-demo .pam-setup .pam-fill-light { color: #4f4f55; }
 .pam-demo .pam-setup input[type="number"] { height: 18px; padding: 0 6px; border-radius: 4px; box-sizing: border-box; }
-.pam-demo .pam-inline { flex-direction: row; align-items: center; gap: 8px; white-space: nowrap; }   /* label and field on one line */
 .pam-demo .controls label { margin-top: 0; }   /* the page's 4 px label offset would misalign the rows */
 /* the four sliders under the image: 4 x 1 -> 2 x 2 -> 1 x 4, by the demo's own width (container query), early
    enough that "Noise Amp. 1.00" always fits */
@@ -358,10 +281,8 @@
 @container (max-width: 380px) { .pam-demo .pam-setup { grid-template-columns: 1fr; } }
 /* the demo as teaser, right under the buttons at the top */
 .pam-demo.pam-teaser { margin-top: 32px; }
-/* small notes in the demo: all at the flowchart chips' size (0.75em of the page text) */
-.pam-demo .pam-intro { margin: 16px 0 0; font-size: 0.75em; line-height: 1.4; color: #888; }   /* one small hint between image and flowchart */
 .pam-demo .pam-keep-note { grid-column: 1 / -1; margin: 0; font-size: 0.9375em; line-height: 1.4; color: #888; }   /* inside .controls (0.8em): 0.9375 x 0.8 = 0.75em; spans the slider row, shown only with the sliders (keepBox) */
-#pamFallback[hidden] { display: none; }   /* static teaser: only without WebGPU */
+#pamFallback[hidden] { display: none; }   /* teaser: only when the demo cannot start */
 .pam-demo .pam-flow { padding-bottom: 16px; border-bottom: 1px solid var(--gray-medium); }   /* line between flowchart and controls */
 
 /* sections end flush: exactly the 96 px section gap after every section, whatever its last element is (a paragraph would add its 1em bottom margin) */
@@ -378,18 +299,16 @@
 .pam-demo .pam-popover .pam-status { font-size: 1em; color: inherit; margin: 0 0 6px; padding: 0; border: 0; }
 .pam-demo .pam-popover .pam-credits { font-size: 0.9em; line-height: 1.4; color: #888; margin: 0; }
 .pam-demo .pam-popover a { color: inherit; }
-.pam-fallback-note { font-size: 0.75em; color: #888; margin: 8px 0 0; }
 .pam-demo .pam-from-row { grid-column: 1 / -1; }   /* Noise From: its own full-width row under the sliders */
 /* level toggles: a column dropping down from the All button of the level bar (main.js sets its width) */
 .pam-demo .pam-mask { left: auto; right: 10px; top: 37px; flex-direction: column; }
 .pam-demo .pam-mask button { text-align: center; }
-.pam-demo .pam-thumb.off canvas { opacity: 0.3; }   /* level left out of the sum */
 /* dividers between segments as borders, not 1 px gaps: gaps at fractional positions render 1 or 2 device px thick,
    borders are snapped to whole device pixels, so every divider has the same width */
 .pam-demo .pam-overlay, .pam-demo .pam-split { gap: 0; }
 .pam-demo .pam-overlay button + button, .pam-demo .pam-split button + button { border-left: 1px solid var(--gray-dark); }
 .pam-demo .pam-mask button + button { border-left: 0; border-top: 1px solid var(--gray-dark); }
-/* selected buttons in dark beige instead of crimson (less pink); the crimson stays for the text */
+/* selected buttons in dark beige instead of crimson (less pink); labels: see the next rule */
 .pam-demo .pam-seg button.on, .pam-demo .chip.on, .pam-demo .pam-plotbtn.on { background: var(--gray-dark); color: var(--highlight-color); font-weight: 600; }
 /* button labels in the neutral text colour, not bold */
 .pam-demo .pam-seg button, .pam-demo .pam-seg button.on, .pam-demo .chip, .pam-demo .chip.on,
@@ -402,3 +321,25 @@
 /* every point of a slider shows exactly one copy of its label: the normal one only on the unfilled part */
 .pam-demo .pam-fill-text:not(.pam-fill-light) { clip-path: inset(0 0 0 var(--p, 50%)); }
 .pam-demo #gainBox .pam-fill-text { clip-path: none; }   /* Noise Amp.: one colour, a single label */
+/* when the demo cannot start: the static teaser, the reason below */
+.pam-fallback { margin-top: 32px; }
+/* teaser_img.jpg with rounded corners and a soft shadow (both in CSS, so the radius stays the same in px at any width),
+   teaser_labels.svg on top: its viewBox has the photo's width and top edge, and reaches 10.2051 pt (of 510.9909) further
+   down for the column captions under the photo; the padding makes room for them. Its top corners are rounded like the
+   photo's (the label column's shadow reaches the top-left corner) */
+.pam-teaser { position: relative; padding-bottom: calc(100% * 10.2051 / 510.9909); }
+.pam-teaser img { display: block; width: 100%; height: auto; }
+.pam-teaser .pam-teaser-img { border-radius: var(--border-radius); box-shadow: 0 0 6px rgba(0, 0, 0, 0.3); }
+.pam-teaser .pam-teaser-labels {
+    position: absolute; top: 0; left: 0;
+    clip-path: inset(0 round var(--border-radius) var(--border-radius) 0 0);
+}
+/* below the teaser: what the real-time demo would show, and why it does not run here */
+.pam-placeholder {
+    display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 9; margin-top: 24px; padding: 24px;
+    box-sizing: border-box; border-radius: 8px; background: var(--gray-light); text-align: center; color: #888;
+}
+.pam-placeholder > div { max-width: 460px; }
+.pam-placeholder p { margin: 0 0 6px; font-size: 0.8em; line-height: 1.4; text-align: center; }
+.pam-placeholder .pam-placeholder-title { font-size: 1em; font-weight: 700; color: #4f4f55; margin-bottom: 10px; }
+.pam-placeholder .pam-fallback-reason { margin-top: 14px; color: #4f4f55; }

@@ -161,13 +161,21 @@
                 </div>
             </div>
 
-            <!-- static teaser: shown instead of the real-time demo when the browser has no WebGPU (main.js) -->
-            <div class="container-wide" id="pamFallback" hidden>
-                <img src="projects/phase-aligned-metamers/teaser-all_same.jpg">
-                <p class="pam-fallback-note">The real-time demo needs a browser with WebGPU (current Chrome, Edge or Safari; Firefox on Windows).</p>
-                    <!-- <p>
-                        <span style="font-weight: bold;">Teaser:</span> We design a broadband stimulus to accurately estimate disparity thresholds across various eccentricities and blur levels. We fit a custom surface through the retrieved threshold estimations. It shows the lowest resolvable disparity 𝑇 as a continuous function of eccentricity 𝜃 and Gaussian filter sigma 𝜎. The green line denotes the minimum 𝑇-value per eccentricity 𝜃 , encoding the amount of blur that can be induced by foveated rendering without degrading stereoscopic depth perception. We validate our findings in a validation study, by showing participants unaltered renderings vs. strongly foveated renderings.
-                    </p> -->
+            <!-- teaser: shown instead of the real-time demo when it cannot start (main.js puts the reason in) -->
+            <div class="pam-fallback" id="pamFallback" hidden>
+                <div class="pam-teaser">
+                    <img src="projects/phase-aligned-metamers/teaser_img.jpg" alt="Foveated, intensity adjusted, oriented and phase aligned (ours) versions of a face, at foveation levels 1/1 to 1/256" class="pam-teaser-img">
+                    <img src="projects/phase-aligned-metamers/teaser_labels.svg" alt="" class="pam-teaser-labels">
+                </div>
+                <div class="pam-placeholder">
+                    <div>
+                        <p class="pam-placeholder-title">Real-Time Demo</p>
+                        <p>In a browser with WebGPU, an interactive version of the method runs here: move the gaze over the image,
+                            step through every stage of the pipeline and change the parameters, all in real time.</p>
+                        <p class="pam-fallback-reason">The real-time demo needs a browser with WebGPU.</p>
+                        <p>It runs in current Chrome, Edge and Safari, and in Firefox on Windows.</p>
+                    </div>
+                </div>
             </div>
         </div>
 

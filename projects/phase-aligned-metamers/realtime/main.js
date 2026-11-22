@@ -54,6 +54,18 @@ const $ = (id) => document.getElementById(id);
 // (relative to the page) of the folder that contains shaders/ and constants.json.
 const BASE = (document.querySelector('[data-pam-demo]') || { dataset: {} }).dataset.base || '';
 let errorShown = false;
+// The demo could not start (no WebGPU, no adapter, an error while setting up): the page's placeholder (#pamFallback)
+// replaces the demo, with the reason in it. Errors later on (e.g. a lost device) only show in the status line.
+let started = false;
+function showFallback(msg) {
+    const fallback = document.getElementById('pamFallback');
+    if (!fallback) return false;
+    const reason = fallback.querySelector('.pam-fallback-reason');
+    if (reason) reason.textContent = msg;
+    fallback.hidden = false;
+    document.querySelector('[data-pam-demo]').hidden = true;
+    return true;
+}
 const status = (msg, isError = false) => {
     if (errorShown && !isError) return;   // keep the first error visible
     errorShown = errorShown || isError;
@@ -138,17 +150,19 @@ function gradient(map) {
 const fmt = (v) => (Math.abs(v) >= 100 || v === 0 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toPrecision(3) : v.toPrecision(2));
 
 async function main() {
-    if (!navigator.gpu) {
-        status('This browser does not support WebGPU. Use a current Chrome, Edge or Safari (or Firefox on Windows).', true);
-        const fallback = document.getElementById('pamFallback');   // the page's static teaser image, if it has one
-        if (fallback) {
-            fallback.hidden = false;
-            document.querySelector('[data-pam-demo]').hidden = true;
+    // ?demo=fallback in the URL: behave as without WebGPU (to check the placeholder)
+    if (!navigator.gpu || new URLSearchParams(location.search).get('demo') === 'fallback') {
+        if (!showFallback('This browser does not support WebGPU, which the real-time demo needs.')) {
+            status('This browser does not support WebGPU. Use a current Chrome, Edge or Safari (or Firefox on Windows).', true);
         }
         return;
     }
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-    if (!adapter) { status('No WebGPU adapter found.', true); return; }
+    if (!adapter) {
+        const msg = 'No WebGPU adapter found (WebGPU may be switched off, or the graphics driver is not supported).';
+        if (!showFallback(msg)) status(msg, true);
+        return;
+    }
     const device = await adapter.requestDevice();
     device.lost.then((info) => status(`GPU device lost: ${info.message}`, true));
     device.addEventListener('uncapturederror', (e) => status(`WebGPU error: ${e.error.message}`, true));
@@ -1024,6 +1038,10 @@ async function main() {
     updateControls();
     updateFills();
     await loadImage($('image').value);
+    started = true;
 }
 
-main().catch((err) => status(`Error: ${err.message}`, true));
+main().catch((err) => {
+    const msg = `Error: ${err.message}`;
+    if (started || !showFallback(msg)) status(msg, true);
+});
