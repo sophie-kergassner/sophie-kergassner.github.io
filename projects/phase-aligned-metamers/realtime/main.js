@@ -28,8 +28,8 @@ const FLOW = [
         { name: 'Foveated', fov: { blur: 1, pyramid: 2, diff: 3 } },   // per-pixel blur / from the pyramid / difference (toggle on the image)
     ] },
     { title: 'Image Pyramids', toFoveated: true, views: [
-        { name: 'Image', mode: 11, level: 'pyramid', thumbs: true },
-        { name: 'Laplacian Band', mode: 7, level: 'laplace', thumbs: true, note: () => state.analyseFoveated
+        { name: 'Image', mode: 11, level: 'pyramid' },
+        { name: 'Laplacian Band', mode: 7, level: 'laplace', note: () => state.analyseFoveated
             ? 'Note how the fine levels (L0, L1, …) only have content around the gaze point: in the periphery they are plain grey, '
               + 'without detail. This lost detail is what our enhancement recovers.'
             : 'These are the bands of the full-res original, so they have detail everywhere. Switch "Measure Statistics On" to '
@@ -472,7 +472,6 @@ async function main() {
     function levelCount(kind) {
         return { pyramid: img.nLevels, laplace: img.nLevels - 1, analysis: img.nAnalysis }[kind] || 1;
     }
-    const hasThumbs = (v) => v.levels || v.thumbs;   // L0..L3 thumbnails under the image
     function auxTexture(l = state.level) {
         const v = currentView(), set = activeSet();
         if (v.levels && state.enhLevel >= 0) return img.bands[state.enhLevel];
@@ -595,7 +594,6 @@ async function main() {
         $('keepBox').hidden = !v.keep;
         $('noiseFromRow').hidden = true;   // hidden toggle: Shift + M or ?noise=measured (see below)
         document.querySelectorAll('#noiseFromBox button').forEach((b) => b.classList.toggle('on', b.dataset.from === state.noiseFrom));
-        $('enhLevels').hidden = !hasThumbs(v);
         $('viewNote').hidden = !v.note;                 // explanatory note under the image for some views
         if (v.note) $('viewNote').textContent = v.note();
         document.querySelectorAll('#variantBox button').forEach((b) => b.classList.toggle('on', b.dataset.variant === state.variant));
@@ -695,7 +693,6 @@ async function main() {
         rp.setBindGroup(0, display);
         rp.draw(3);
         rp.end();
-        if (hasThumbs(currentView())) renderThumbs(encoder, c);
 
         const doReadback = !readbackBusy;
         if (doReadback) {   // fit and Laplacian std for the info line and the legends (arrives a frame later)
@@ -720,63 +717,6 @@ async function main() {
         }
         device.queue.onSubmittedWorkDone().then(() => { $('frame').textContent = `${(performance.now() - t0).toFixed(1)} ms / frame`; });
         if (animate) requestRender();
-    }
-
-    // Thumbnails L0..L3 under the image.
-    //   Enhancement: the contribution of every synthesized level (display mode 18), on the same grey scale as the sum.
-    //                Click: show that level large; click again: back to the sum.
-    //   Pyramid image / Laplacian band: that level, as in the large view. Click: show that level large.
-    const thumbs = [0, 1, 2, 3].map((s) => {
-        const box = document.createElement('button');
-        box.type = 'button';
-        box.className = 'pam-thumb';
-        box.innerHTML = `<canvas></canvas><span>L${s}</span>`;
-        box.addEventListener('click', () => {
-            if (currentView().levels) state.enhLevel = state.enhLevel === s ? -1 : s;
-            else state.level = s;
-            updateControls();
-            requestRender();
-        });
-        $('enhLevels').appendChild(box);
-        const cv = box.querySelector('canvas');
-        const ctx = cv.getContext('webgpu');
-        ctx.configure({ device, format: canvasFormat, alphaMode: 'opaque' });
-        return { s, box, cv, ctx, params: uniformBuffer(28 * 4), label: box.querySelector('span') };
-    });
-    function renderThumbs(encoder, c) {
-        const r = consts.ratios, dpr = window.devicePixelRatio || 1;
-        const v = currentView(), enh = !!v.levels;
-        for (const t of thumbs) {
-            const shown = enh || t.s < levelCount(v.level);
-            t.box.hidden = !shown;
-            if (!shown) continue;
-            const mode = enh ? 18 : v.mode;
-            const aux = enh ? img.bands[Math.min(t.s, img.bands.length - 1)] : auxTexture(t.s);
-            const cssW = t.cv.clientWidth || 200;
-            const cw = Math.max(1, Math.round(cssW * dpr)), ch = Math.max(1, Math.round(cssW * img.h / img.w * dpr));
-            if (t.cv.width !== cw || t.cv.height !== ch) { t.cv.width = cw; t.cv.height = ch; }
-            t.cv.style.height = `${cssW * img.h / img.w}px`;
-            device.queue.writeBuffer(t.params, 0, new Float32Array([
-                img.w, img.h, pxPerCm(), consts.sigma0,
-                state.gaze[0], state.gaze[1], uniformLevel(), img.maxLayer,
-                0, 0, state.distance, mode,
-                r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7],
-                cw, ch, 0, currentView().amp ? state.gain : 1,
-                t.s, displayScale(mode, t.s), 0, c,
-            ]));
-            const group = bindGroup(displayLayout, [[0, t.params], [1, img.ycc], [2, img.fov], [3, img.maps], [4, img.fovPyr],
-                [5, aux], [6, img.final], [7, bandStdsBuffer], [8, fitBuffer]]);
-            const pass = encoder.beginRenderPass({
-                colorAttachments: [{ view: t.ctx.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] }],
-            });
-            pass.setPipeline(displayPipeline);
-            pass.setBindGroup(0, group);
-            pass.draw(3);
-            pass.end();
-            t.label.textContent = !enh || t.s < c ? `L${t.s}` : `L${t.s} · Not Synthesized`;
-            t.box.classList.toggle('on', enh ? state.enhLevel === t.s : state.level === t.s);
-            t.box.classList.toggle('off', enh && maskActive() && !state.levelOn[t.s]);   // left out of the sum
-        }
     }
 
     // Intensity fit plot (SVG): band std per level (point size = weight in the fit), the fitted line, and the noise

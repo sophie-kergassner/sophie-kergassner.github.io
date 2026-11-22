@@ -389,3 +389,16 @@
 .pam-demo .pam-overlay, .pam-demo .pam-split { gap: 0; }
 .pam-demo .pam-overlay button + button, .pam-demo .pam-split button + button { border-left: 1px solid var(--gray-dark); }
 .pam-demo .pam-mask button + button { border-left: 0; border-top: 1px solid var(--gray-dark); }
+/* selected buttons in dark beige instead of crimson (less pink); the crimson stays for the text */
+.pam-demo .pam-seg button.on, .pam-demo .chip.on, .pam-demo .pam-plotbtn.on { background: var(--gray-dark); color: var(--highlight-color); font-weight: 600; }
+/* button labels in the neutral text colour, not bold */
+.pam-demo .pam-seg button, .pam-demo .pam-seg button.on, .pam-demo .chip, .pam-demo .chip.on,
+.pam-demo .pam-plotbtn, .pam-demo .pam-plotbtn.on, .pam-demo .pam-fill-text:not(.pam-fill-light) { color: #4f4f55; font-weight: 400; }
+.pam-demo .pam-setup .pam-fill-text:not(.pam-fill-light) { color: var(--gray-darker, #878787); }   /* Viewing Setup stays light grey */
+/* Noise Amp.: neutral like the buttons (dark beige fill, grey text); the three statistics sliders keep the crimson */
+.pam-demo #gainBox input[type="range"] { background: linear-gradient(to right, var(--gray-dark) var(--p, 50%), var(--gray-light) var(--p, 50%)); }
+.pam-demo #gainBox .pam-fill-light { display: none; }   /* same colour on the fill: no second copy, which would look bold */
+.pam-demo .pam-row-text { color: #4f4f55; }   /* Measure Statistics On, Intensity Fit */
+/* every point of a slider shows exactly one copy of its label: the normal one only on the unfilled part */
+.pam-demo .pam-fill-text:not(.pam-fill-light) { clip-path: inset(0 0 0 var(--p, 50%)); }
+.pam-demo #gainBox .pam-fill-text { clip-path: none; }   /* Noise Amp.: one colour, a single label */
