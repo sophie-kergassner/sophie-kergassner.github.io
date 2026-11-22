@@ -39,7 +39,11 @@ const FLOW = [
     { title: 'Statistics', toFoveated: true, views: [
         { name: 'Intensity', stat: { measured: 10, repaired: 12 }, level: 'analysis', legend: { map: 'warm', scale: true, positive: true, unit: '|G + iH| · Modulator' } },
         { name: 'Orientation', stat: { measured: 8, repaired: 13 }, level: 'analysis', legend: { map: 'cyclic', min: -90, max: 90, unit: 'deg' } },
-        { name: 'Phase', stat: { measured: 9, repaired: 14 }, level: 'analysis', legend: { map: 'cyclic', min: -180, max: 180, unit: 'deg' } },
+        { name: 'Phase', stat: { measured: 9, repaired: 14 }, level: 'analysis', legend: { map: 'cyclic', min: -180, max: 180, unit: 'deg' },
+          // "Line / Edge" toggle (#phaseBox): which structure the phase describes (structure() in display.wgsl)
+          structure: { measured: 19, repaired: 20 },
+          structureLegend: { map: 'structure', labels: ['Line', 'Edge'], unit: '· white: no data' },
+          note: () => 'Angle: frequency-adjusted per level. Line / Edge: the semantics, only spatially upscaled.' },
     ] },
     { title: 'Noise', views: [
         { name: 'Enhancement', mode: 16, levels: true, keep: true, amp: true, legend: { map: 'gray', scale: true, unit: 'Y' } },
@@ -78,6 +82,7 @@ const status = (msg, isError = false) => {
 const state = {
     stage: 5, view: 0,      // selected flowchart node and view
     variant: 'repaired',    // statistics: measured / repaired
+    phaseShow: 'angle',     // Phase view: the angle ('angle', cyclic map) or the structure it describes ('structure': line / edge / none)
     fovMethod: 'blur',      // foveated view: per-pixel blur / from the pyramid / their difference
     level: 0,               // pyramid level of the level views
     gaze: null,             // [row, col] in image pixels
@@ -138,11 +143,15 @@ const cyclic = (t) => {
     const a = CYCLIC_STOPS[i], b = CYCLIC_STOPS[(i + 1) % 4];
     return a.map((v, k) => v + (b[k] - v) * f);
 };
+// phase as structure, at full strength: line (slate blue #5b7088, t = 0) -> edge (crimson #bf0c4c, t = 1), mixed by
+// sin^2(phase); as structure() in display.wgsl (which also fades to white where the band has little energy)
+const structureColor = (t) => [0.357, 0.439, 0.533].map((v, k) => v + ([0.749, 0.047, 0.298][k] - v) * t);
 function gradient(map) {
     const stops = [];
     for (let i = 0; i <= 16; i++) {
         const t = i / 16;
-        const rgb = map === 'inferno' ? inferno(t) : map === 'cyclic' ? cyclic(t) : map === 'warm' ? warm(t) : map === 'diverging' ? diverging(t) : [t, t, t];
+        const rgb = map === 'inferno' ? inferno(t) : map === 'cyclic' ? cyclic(t) : map === 'warm' ? warm(t) : map === 'diverging' ? diverging(t)
+            : map === 'structure' ? structureColor(t) : [t, t, t];
         stops.push(`rgb(${rgb.map((x) => Math.round(255 * x)).join(',')}) ${(100 * t).toFixed(1)}%`);
     }
     return `linear-gradient(to right, ${stops.join(', ')})`;
@@ -168,7 +177,7 @@ async function main() {
     device.addEventListener('uncapturederror', (e) => status(`WebGPU error: ${e.error.message}`, true));
 
     const names = ['common', 'sampling', 'ycbcr', 'blur', 'foveate', 'foveate_pyramid', 'pyramid_down', 'laplace',
-                   'analysis_filters', 'analysis_orient', 'lap_stats', 'lap_finalize', 'fit', 'repair_common', 'repair_init', 'repair_phi', 'repair_level',
+                   'analysis_filters', 'analysis_orient', 'lap_stats', 'lap_finalize', 'fit', 'repair_common', 'repair_init', 'repair_phi', 'repair_level', 'semantics',
                    'noise_band', 'noise_stats', 'noise_finalize', 'compose', 'display'];
     const src = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await loadText(`${BASE}shaders/${n}.wgsl`)])));
     const consts = await (await fetch(`${BASE}constants.json`)).json();
@@ -214,6 +223,7 @@ async function main() {
         repInit: computePipeline(code('sampling', 'repair_common', 'repair_init'), [uniform(0), tex(1), storage(2, 'rgba32float'), roStorage(15)]),
         repPhi: computePipeline(code('sampling', 'repair_common', 'repair_phi'), [uniform(0), ...texs(1, 4), storage(5, 'rgba32float')]),
         repLevel: computePipeline(code('sampling', 'repair_common', 'repair_level'), [uniform(0), ...texs(1, 5), storage(6, 'rgba32float'), roStorage(15)]),
+        sem: computePipeline(code('sampling', 'repair_common', 'semantics'), [uniform(0), ...texs(1, 4), storage(5, 'rgba32float')]),
         band: computePipeline(code('noise_band'), [uniform(0), roStorage(1), tex(2), storage(3, 'r32float'), roStorage(4)]),
         compose: computePipeline(code('common', 'sampling', 'compose'),
             [uniform(0), uniform(1), ...texs(2, 8), roStorage(9), storage(10, 'rgba32float'), roStorage(11)]),
@@ -245,6 +255,8 @@ async function main() {
     const composeBuffer = uniformBuffer(16);
     const fitParamsBuffer = uniformBuffer(16);
     const repairBuffers = Array.from({ length: ANALYSIS_LEVELS }, (_, s) => fixedUniform([s, 0, 0, 0]));
+    // phase semantics (semantics.wgsl) of level l from the measured (1) or the repaired (0) phases
+    const semBuffers = { measured: repairBuffers.map((_, l) => fixedUniform([l, 1, 0, 0])), repaired: repairBuffers };
     const kernelBuffer = fixedBuffer(consts.pyr_kernel, GPUBufferUsage.STORAGE);
     const filterBuffer = fixedBuffer(consts.filters, GPUBufferUsage.STORAGE);
     const bandStdsBuffer = device.createBuffer({ size: 32, usage: GPUBufferUsage.STORAGE });
@@ -400,6 +412,7 @@ async function main() {
         // ---- per-frame resources and bind groups
         img.rep = img.sizes.slice(0, nAnalysis).map((s) => make(...s, 'rgba32float'));
         img.phi = img.sizes.slice(0, nAnalysis).map((s) => make(...s, 'rgba32float'));
+        img.sem = img.sizes.slice(0, nAnalysis - 1).map((s) => make(...s, 'rgba32float'));   // level l needs level l+1
         img.bands = img.sizes.slice(0, NOISE_LEVELS).map((s) => make(...s, 'r32float'));
         const partial = (gx, gy) => {
             const b = device.createBuffer({ size: gx * gy * 8, usage: GPUBufferUsage.STORAGE });
@@ -449,6 +462,8 @@ async function main() {
                 set.analysis[s + 1], img.rep[s + 1], set.analysis[s + 2], img.rep[s + 2], img.phi[s + 1]]) : null);
             set.repLevel = img.rep.map((r, s) => s + 1 < nAnalysis ? bindGroup(P.repLevel.layout, [[0, repairBuffers[s]], [1, img.maps],
                 [2, set.analysis[s]], [3, img.rep[s + 1]], [4, set.analysis[s + 1]], [5, img.phi[s + 1]], [6, r], [15, fitBuffer]]) : null);
+            set.sem = Object.fromEntries(['measured', 'repaired'].map((variant) => [variant, img.sem.map((out, l) => bg(P.sem,
+                [semBuffers[variant][l], set.analysis[l], img.rep[l], set.analysis[l + 1], img.rep[l + 1], out]))]));
         }
 
         state.gaze = [h / 2, w / 2];
@@ -480,15 +495,19 @@ async function main() {
         if (v.levels) return state.enhLevel >= 0 ? 18 : 16;   // Enhancement: sum, or the contribution of one level
         if (v.fov) return v.fov[state.fovMethod];
         if (!v.stat) return v.mode;
-        return state.variant === 'repaired' ? v.stat.repaired : v.stat.measured;
+        const stat = v.structure && state.phaseShow === 'structure' ? v.structure : v.stat;
+        return state.variant === 'repaired' ? stat.repaired : stat.measured;
     }
     const activeSet = () => (state.analyseFoveated ? img.fovSet : img.orig);
+    const structureOn = () => !!currentView().structure && state.phaseShow === 'structure';
     function levelCount(kind) {
-        return { pyramid: img.nLevels, laplace: img.nLevels - 1, analysis: img.nAnalysis }[kind] || 1;
+        // the phase semantics of level l need level l+1: one level fewer
+        return { pyramid: img.nLevels, laplace: img.nLevels - 1, analysis: img.nAnalysis - (structureOn() ? 1 : 0) }[kind] || 1;
     }
     function auxTexture(l = state.level) {
         const v = currentView(), set = activeSet();
         if (v.levels && state.enhLevel >= 0) return img.bands[state.enhLevel];
+        if (structureOn()) return img.sem[Math.min(l, img.sem.length - 1)];
         switch (v.level) {
             case 'pyramid': return l === 0 ? (state.analyseFoveated ? img.fov : img.ycc) : set.levels[l];
             case 'laplace': return set.laplace[l];
@@ -508,10 +527,11 @@ async function main() {
             // Measured and repaired share one scale, so they can be compared: the repaired intensity carries the
             // intensity of coarser levels (up to the cutoff, with their larger modulator) into level l, so the top of
             // the scale is MAG_MAX * modulator of the coarsest level that can reach level l.
-            case 10: case 12: {
+            // 19, 20 (phase as structure): the same scale, it fades out where the intensity is low
+            case 10: case 12: case 19: case 20: {
                 const k = Math.min(Math.max(l, state.gpuInfo ? state.gpuInfo.cutoff : l), mods.length - 1);
                 const top = MAG_MAX * Math.max(mods[k] || 0, 1e-9);
-                return mode === 10 ? (mods[l] || 0) / top : 1 / top;   // measured view shows |G + iH| (unmodulated)
+                return mode === 10 || mode === 19 ? (mods[l] || 0) / top : 1 / top;   // measured shows |G + iH| (unmodulated)
             }
             case 16: case 18: return 4;                                // noise enhancement around mid-grey
             default: return 1;
@@ -530,9 +550,18 @@ async function main() {
     // seen so far), so the bar does not move while clicking through levels, only when switching to another view.
     const legendMinChars = {};
     function updateLegend() {
-        const v = currentView(), lg = v.fov && state.fovMethod === 'diff' ? DIFF_LEGEND : v.legend;
+        const v = currentView();
+        const lg = v.fov && state.fovMethod === 'diff' ? DIFF_LEGEND
+            : v.structure && state.phaseShow === 'structure' ? v.structureLegend : v.legend;
         $('legend').hidden = !lg;
         if (!lg) return;
+        if (lg.labels) {   // categorical ends (Line / Edge) instead of numbers
+            $('legendMin').style.width = '';
+            $('legendBar').style.background = gradient(lg.map);
+            [$('legendMin').textContent, $('legendMax').textContent] = lg.labels;
+            $('legendUnit').textContent = lg.unit;
+            return;
+        }
         const [min, max] = legendRange(lg, currentMode(), state.level);
         const key = `${state.stage}/${state.view}/${v.fov ? state.fovMethod : ''}`;
         const levels = v.level && img ? levelCount(v.level) : 1;
@@ -608,7 +637,10 @@ async function main() {
         $('keepBox').hidden = !v.keep;
         $('noiseFromRow').hidden = true;   // hidden toggle: Shift + M or ?noise=measured (see below)
         document.querySelectorAll('#noiseFromBox button').forEach((b) => b.classList.toggle('on', b.dataset.from === state.noiseFrom));
-        $('viewNote').hidden = !v.note;                 // explanatory note under the image for some views
+        $('phaseBox').hidden = !v.structure;            // Phase view: Angle / Line / Edge
+        document.querySelectorAll('#phaseBox button').forEach((b) => b.classList.toggle('on', b.dataset.phase === state.phaseShow));
+        // explanatory note under the image for some views
+        $('viewNote').hidden = !v.note;
         if (v.note) $('viewNote').textContent = v.note();
         document.querySelectorAll('#variantBox button').forEach((b) => b.classList.toggle('on', b.dataset.variant === state.variant));
         document.querySelectorAll('#analyseBox button').forEach((b) => b.classList.toggle('on', +b.dataset.analyse === +state.analyseFoveated));
@@ -682,6 +714,10 @@ async function main() {
         for (let s = fromMeasured ? -1 : c - 1; s >= 0; s--) {
             run(pass, P.repPhi, set.repPhi[s], ...img.sizes[s + 1]);
             run(pass, P.repLevel, set.repLevel[s], ...img.sizes[s]);
+        }
+        if (structureOn()) {   // Line / Edge view: phase semantics of the shown level
+            const l = Math.min(state.level, img.sem.length - 1);
+            run(pass, P.sem, set.sem[state.variant][l], ...img.sizes[l]);
         }
         // noise bands of the levels below the cutoff, their std at full resolution, composition
         const randomize = Math.min(...state.keep) < 1 ? 1 : 0;
@@ -923,6 +959,9 @@ async function main() {
     }));
     document.querySelectorAll('#variantBox button').forEach((b) => b.addEventListener('click', () => {
         state.variant = b.dataset.variant; updateControls(); requestRender();
+    }));
+    document.querySelectorAll('#phaseBox button').forEach((b) => b.addEventListener('click', () => {
+        state.phaseShow = b.dataset.phase; updateControls(); requestRender();
     }));
     // fit plot: hidden until opened with the chart button next to the Intensity Fit toggle
     $('fitPlotBtn').addEventListener('click', () => {

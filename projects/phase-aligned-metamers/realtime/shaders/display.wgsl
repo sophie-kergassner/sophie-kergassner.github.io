@@ -5,6 +5,7 @@
 //    7 Laplacian band, 8 orientation, 9 phase, 10 magnitude |G + iH|       (measured)
 //   11 pyramid image (RGB),
 //   12 intensity_rep, 13 dir_rep, 14 phase_rep                             (after the repair)
+//   19, 20 phase semantics as structure (line / edge / none), measured / repaired (aux: semantics.wgsl of level l)
 //   15 final image, 16 noise enhancement,
 //   18 contribution of level l to the noise enhancement (aux = noise band l):
 //      upsample(band_l) / std_l * modulator_l * clamp(level - l, 0, 1), as one term of compose.wgsl
@@ -87,6 +88,17 @@ fn cyclic(t: f32) -> vec3<f32> {
     return mix(stops[i], stops[(i + 1) % 4], x - f32(i));
 }
 
+// Which structure the phase (here: the phase semantics, semantics.wgsl) describes. phase = atan2(H, G): near 0 / pi the even filter G answers alone -> a line
+// (bright / dark), near +-pi/2 the odd filter H -> an edge (rising / falling); the sign is ignored. Line: slate blue
+// #5b7088, edge: crimson #bf0c4c, mixed by sin^2(phase). Where the band has little energy the phase is meaningless:
+// faded to white (beige #f1efe3) by the strength t (1 = top of the intensity scale; full colour from t = 0.5 on).
+// As structureColor() in main.js (legend).
+fn structure(phi: f32, t: f32) -> vec3<f32> {
+    let s = sin(phi);
+    let hue = mix(vec3<f32>(0.357, 0.439, 0.533), vec3<f32>(0.749, 0.047, 0.298), s * s);
+    return mix(vec3<f32>(0.945, 0.937, 0.890), hue, clamp(2.0 * t, 0.0, 1.0));
+}
+
 @fragment
 fn fs(in: VSOut) -> @location(0) vec4<f32> {
     let size = vec2<f32>(P.size.x, P.size.y);
@@ -114,6 +126,9 @@ fn fs(in: VSOut) -> @location(0) vec4<f32> {
         case 10: { rgb = warm(a.z * P.aux.y); }
         case 11: { rgb = ycc_to_rgb(a.rgb); }
         case 12: { rgb = warm(a.x * P.aux.y); }
+        // phase semantics (aux = semantics.wgsl output: (sem, strength)), 19 measured / 20 repaired; the strength is
+        // scaled as in the intensity views (10 / 12)
+        case 19, 20: { rgb = structure(a.x, a.y * P.aux.y); }
         case 15: { rgb = ycc_to_rgb(fin.rgb); }
         case 16: { rgb = vec3<f32>(0.5 + fin.a * P.aux.y); }
         case 18: {

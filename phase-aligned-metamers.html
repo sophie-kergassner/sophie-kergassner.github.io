@@ -86,16 +86,20 @@
                         <button type="button" data-variant="measured" title="measured on the image chosen under 'Measure Statistics On'">Measured</button>
                         <button type="button" data-variant="repaired" class="on" title="after the repair (extrapolated from coarser levels)">Repaired/Extrapolated</button>
                     </div>
+                    <div id="phaseBox" class="pam-seg pam-overlay pam-phase" hidden>
+                        <button type="button" data-phase="angle" class="on" title="the phase angle (cyclic colour map)">Angle</button>
+                        <button type="button" data-phase="structure" title="which structure the phase describes: line (blue, near 0° / 180°), edge (crimson, near ±90°), no data (white, little energy)">Line / Edge</button>
+                    </div>
                     <div id="enhBox" class="pam-seg pam-overlay" hidden>
                         <button type="button" data-enh="1" class="on" title="foveated image with the synthesized noise added (our method)">Enhancement On</button>
                         <button type="button" data-enh="0" title="foveated image only, without the noise">Enhancement Off</button>
                     </div><div id="infoPop" class="pam-popover" role="dialog" hidden><p class="pam-status"><span id="status">Starting ...</span> <span id="frame"></span></p><p class="pam-credits">Scenes from the <a href="https://www.blender.org/download/demo-files/" target="_blank">Blender demo files</a>: Classroom by Christophe Seux (CC0); Drawn House: House of Chores by Blender Studio (CC BY); Fish: Gold by Blender Studio (CC BY); Italian Flat by Flavio Della Tommasa (CC BY); Mossy Tree: Tree, leaves and grass by Simon Thommes, Blender Studio (CC0). Face: photos from <a href="https://unsplash.com/photos/woman-holding-her-face-hHCJcg4ZxWQ" target="_blank">Unsplash</a> (Unsplash license).</p></div><div class="pam-icons"><select id="image" hidden>
-                            <option value="projects/phase-aligned-metamers/realtime/images/classroom_2k.jpg">Classroom</option>
-                            <option value="projects/phase-aligned-metamers/realtime/images/drawnhouse_2k.jpg">Drawn House</option>
-                            <option value="projects/phase-aligned-metamers/realtime/images/face_2k.jpg" selected>Face</option>
-                            <option value="projects/phase-aligned-metamers/realtime/images/fish_2k.jpg">Fish</option>
-                            <option value="projects/phase-aligned-metamers/realtime/images/italianflat_2k.jpg">Italian Flat</option>
-                            <option value="projects/phase-aligned-metamers/realtime/images/mossytree_2k.jpg">Mossy Tree</option>
+                            <option value="projects/phase-aligned-metamers/realtime/images/classroom.jpg">Classroom</option>
+                            <option value="projects/phase-aligned-metamers/realtime/images/drawnhouse.jpg">Drawn House</option>
+                            <option value="projects/phase-aligned-metamers/realtime/images/face.jpg" selected>Face</option>
+                            <option value="projects/phase-aligned-metamers/realtime/images/fish.jpg">Fish</option>
+                            <option value="projects/phase-aligned-metamers/realtime/images/italianflat.jpg">Italian Flat</option>
+                            <option value="projects/phase-aligned-metamers/realtime/images/mossytree.jpg">Mossy Tree</option>
                         </select><button type="button" id="infoBtn" class="pam-fs" aria-expanded="false"></button><button type="button" id="sceneBtn" class="pam-fs"></button><button type="button" id="autoGazeBtn" class="pam-fs"></button><button type="button" id="showGazeBtn" class="pam-fs"></button><button type="button" id="fullscreen" class="pam-fs" title="Full screen (Esc to leave); the foveation follows the image's physical size" aria-label="Full screen"></button></div></div>
                 <p id="viewNote" class="pam-note" hidden></p>
                 <div id="flow" class="pam-flow"></div>

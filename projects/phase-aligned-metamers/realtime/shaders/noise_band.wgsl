@@ -86,8 +86,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     var noise = 0.0;
     for (var loc = 0; loc < 64; loc++) {
-        let ws = loc / 8;            // starting_x = [i for i in range(8) for _ in range(8)]
-        let hs = loc % 8;            // starting_y = list(range(8)) * 8
+        // all 64 (row, col) offsets of the 8x8 impulse cell, as NoiseGenerator's default
+        // impulse_offsets (the order differs, which does not change the sum)
+        let ws = loc / 8;            // col offset
+        let hs = loc % 8;            // row offset
         let oy = impulse_offset(y, hs, i32(BP.full_h));
         let ox = impulse_offset(x, ws, i32(BP.full_w));
         if (oy == 99 || ox == 99) { continue; }
