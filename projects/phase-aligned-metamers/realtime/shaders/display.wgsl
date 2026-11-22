@@ -1,11 +1,11 @@
 // Draws the selected view to the canvas.
 // View modes (P.viewer.w); "aux" is a map of pyramid level l = P.aux.x:
-//    0 original, 1 foveated (per-pixel blur), 2 foveated (pyramid), 3 difference blur - pyramid (Y),
+//    0 original, 1 foveated (per-pixel blur), 2 foveated (pyramid), 3 difference per-pixel blur - pyramid (Y),
 //    4 eccentricity, 5 pyramid level, 6 blur sigma,
 //    7 Laplacian band, 8 orientation, 9 phase, 10 magnitude |G + iH|       (measured)
 //   11 pyramid image (RGB),
 //   12 intensity_rep, 13 dir_rep, 14 phase_rep                             (after the repair)
-//   15 final image, 16 noise enhancement, 17 noise band of level l,
+//   15 final image, 16 noise enhancement,
 //   18 contribution of level l to the noise enhancement (aux = noise band l):
 //      upsample(band_l) / std_l * modulator_l * clamp(level - l, 0, 1), as one term of compose.wgsl
 // Requires common.wgsl and sampling.wgsl (prepended by the host).
@@ -53,16 +53,38 @@ fn inferno(t_in: f32) -> vec3<f32> {
     return clamp(c0 + t * (c1 + t * (c2 + t * (c3 + t * (c4 + t * (c5 + t * c6))))), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
-// cyclic colormap for angles (t and t + 1 give the same colour)
-fn cyclic(t: f32) -> vec3<f32> {
-    return 0.5 + 0.45 * cos(6.2831853 * (t + vec3<f32>(0.0, 0.3333, 0.6667)));
+// sequential colour map from the project colours: near-black #1d1216 -> dark crimson #6e072c -> crimson #bf0c4c -> salmon #dd8a78 -> beige #f1efe3, brightness increasing throughout (linear in sRGB); same as warm() in main.js (legend)
+fn warm(t_in: f32) -> vec3<f32> {
+    var stops = array<vec3<f32>, 5>(
+        vec3<f32>(0.114, 0.071, 0.086),    // #1d1216
+        vec3<f32>(0.431, 0.027, 0.173),    // #6e072c
+        vec3<f32>(0.749, 0.047, 0.298),    // #bf0c4c
+        vec3<f32>(0.867, 0.541, 0.471),    // #dd8a78
+        vec3<f32>(0.945, 0.937, 0.890));   // #f1efe3
+    let x = clamp(t_in, 0.0, 1.0) * 4.0;
+    let i = min(i32(floor(x)), 3);
+    return mix(stops[i], stops[i + 1], x - f32(i));
 }
 
-// diverging blue - white - red for signed values in [-1, 1]
+// diverging colour map from the project colours: slate blue #5b7088 (-1) - beige #f1efe3 (0) - crimson #bf0c4c (+1); as diverging() in main.js
 fn diverging(v_in: f32) -> vec3<f32> {
     let v = clamp(v_in, -1.0, 1.0);
-    if (v < 0.0) { return mix(vec3<f32>(1.0), vec3<f32>(0.13, 0.40, 0.67), -v); }
-    return mix(vec3<f32>(1.0), vec3<f32>(0.70, 0.09, 0.17), v);
+    let mid = vec3<f32>(0.945, 0.937, 0.890);
+    if (v < 0.0) { return mix(mid, vec3<f32>(0.357, 0.439, 0.533), -v); }
+    return mix(mid, vec3<f32>(0.749, 0.047, 0.298), v);
+}
+
+// cyclic colormap for angles (t and t + 1 give the same colour), from the project colours, around the circle: beige #f1efe3 -> crimson #bf0c4c -> dark #2b1a22 -> slate blue #5b7088 -> beige (linear in sRGB);
+// same as cyclic() in main.js (legend)
+fn cyclic(t: f32) -> vec3<f32> {
+    var stops = array<vec3<f32>, 4>(
+        vec3<f32>(0.945, 0.937, 0.890),    // beige   #f1efe3
+        vec3<f32>(0.749, 0.047, 0.298),    // crimson #bf0c4c
+        vec3<f32>(0.169, 0.102, 0.133),    // dark    #2b1a22
+        vec3<f32>(0.357, 0.439, 0.533));   // slate   #5b7088
+    let x = fract(t) * 4.0;
+    let i = min(i32(floor(x)), 3);
+    return mix(stops[i], stops[(i + 1) % 4], x - f32(i));
 }
 
 @fragment
@@ -89,28 +111,32 @@ fn fs(in: VSOut) -> @location(0) vec4<f32> {
         case 7: { rgb = vec3<f32>(0.5 + a.r * P.aux.y); }
         case 8, 13: { rgb = cyclic(select(a.x, a.y, mode == 13) / 3.14159265 + 0.5); }   // orientation, period pi
         case 9, 14: { rgb = cyclic(select(a.y, a.z, mode == 14) / 6.2831853 + 0.5); }    // phase, period 2 pi
-        case 10: { rgb = inferno(a.z * P.aux.y); }
+        case 10: { rgb = warm(a.z * P.aux.y); }
         case 11: { rgb = ycc_to_rgb(a.rgb); }
-        case 12: { rgb = inferno(a.x * P.aux.y); }
+        case 12: { rgb = warm(a.x * P.aux.y); }
         case 15: { rgb = ycc_to_rgb(fin.rgb); }
         case 16: { rgb = vec3<f32>(0.5 + fin.a * P.aux.y); }
         case 18: {
             var c = 0.0;
             if (l < i32(P.aux.w)) {   // P.aux.w: cutoff; levels >= cutoff are not synthesized
                 let up = upsample_at(aux, p, exp2(f32(l))).r;
-                c = up / max(stds[l], 1e-12) * FIT[l] * clamp(m.y - f32(l), 0.0, 1.0);
+                c = up / max(stds[l], 1e-12) * FIT[l] * clamp(m.y - f32(l), 0.0, 1.0) * P.disp.w;   // x noise amp.
             }
             rgb = vec3<f32>(0.5 + c * P.aux.y);
         }
-        default: { rgb = vec3<f32>(0.5 + a.r / max(stds[l], 1e-12) * P.aux.y); }       // noise band, normalized
+        default: { rgb = vec3<f32>(0.0); }
     }
 
-    // gaze marker: thin ring, 7 canvas px radius
+    // gaze marker: beige ring (radius 7, 2 canvas px wide, anti-aliased) with a soft drop shadow (offset 1 px down,
+    // blur ~3 px, 35 % black), like the overlay buttons; measured in canvas px at the continuous position
     if (P.disp.z > 0.5) {
         let px_per_canvas = P.size.x / P.disp.x;
-        let d = distance(vec2<f32>(f32(p.y), f32(p.x)), P.gaze.xy) / px_per_canvas;
-        if (d > 6.0 && d < 8.0) { rgb = vec3<f32>(1.0); }
-        if (d > 5.0 && d <= 6.0) { rgb = vec3<f32>(0.0); }
+        let rc = vec2<f32>(in.uv.y * size.y, in.uv.x * size.x) - 0.5;              // (row, col), continuous
+        let ring = abs(distance(rc, P.gaze.xy) / px_per_canvas - 7.0) - 1.0;        // signed distance to the ring
+        let shadow_d = abs(distance(rc - vec2<f32>(px_per_canvas, 0.0), P.gaze.xy) / px_per_canvas - 7.0) - 1.0;
+        let shadow = 0.35 * exp(-pow(max(shadow_d, 0.0) / 3.0, 2.0));
+        rgb = mix(rgb, vec3<f32>(0.0), shadow);
+        rgb = mix(rgb, vec3<f32>(0.945, 0.937, 0.890), clamp(0.5 - ring, 0.0, 1.0));   // beige #f1efe3
     }
     return vec4<f32>(clamp(rgb, vec3<f32>(0.0), vec3<f32>(1.0)), 1.0);
 }

@@ -52,17 +52,51 @@ sup{
     color: #555;
     overflow-x: auto;
 }
+/* Rows are plain block lines with inline children (not grid/flex):
+   grid items get "blockified", which makes copy-paste insert line breaks
+   around the '='. Inline-block keeps the column look but copies as one line. */
 .bib .row {
-    display:grid;
-    grid-template-columns: max-content max-content 1fr; /* key | = | value */
-    column-gap: 8px;
+    display: block;
     white-space: nowrap;            /* keep each BibTeX row on one line */
     overflow-wrap: normal;
-    /* margin: 2px 0; */
 }
-.bib-key { 
-    width:90px; 
-    margin-left:30px;
+.bib .row > span:nth-child(2) {     /* the '=' */
+    margin: 0 8px;
+}
+.bib-key {
+    display: inline-block;
+    width: 90px;
+    margin-left: 30px;
+}
+
+/* Copy button (added by bib-copy.js) */
+.bib-wrap {
+    position: relative;
+}
+.bib-copy {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #888;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.bib-copy:hover,
+.bib-copy:focus-visible {
+    background: var(--gray-medium);
+    color: #333;
+}
+.bib-copy.copied {
+    color: #2e9e5b;
 }
 
 .video {

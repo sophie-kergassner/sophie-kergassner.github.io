@@ -7,7 +7,7 @@ struct ComposeParams {
     cutoff: f32,
     base: f32,           // 0: per-pixel blur (img.fov), 1: pyramid foveation
     gain: f32,           // noise gain of the "Final image" view (1 = as in the pipeline, 0 = no noise)
-    _p0: f32,
+    excluded: f32,       // bit s set: level s is left out of the noise (level toggles of the web demo; 0 = all levels)
 }
 
 @group(0) @binding(1) var<uniform> CP: ComposeParams;
@@ -40,8 +40,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     var noise = 0.0;
     for (var s = 0; s < min(i32(CP.cutoff), 4); s++) {
         let w = clamp(L - f32(s), 0.0, 1.0);
-        if (w > 0.0) {
-            noise += band_up(s, p) / stds[s] * FIT[s] * w;
+        let left_out = ((u32(CP.excluded) >> u32(s)) & 1u) == 1u;
+        if (w > 0.0 && !left_out) {
+            // a band without any signal (e.g. measured statistics of a level whose modulator is 0: intensity 0
+            // everywhere) has std 0; it adds nothing instead of 0 / 0 = NaN, which would turn the image black
+            if (stds[s] > 0.0) { noise += band_up(s, p) / stds[s] * FIT[s] * w; }
         }
     }
     noise *= CP.gain;

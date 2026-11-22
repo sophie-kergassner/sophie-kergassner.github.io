@@ -7,7 +7,7 @@ struct Params {
     viewer: vec4<f32>,    // viewer vertical [cm], horizontal [cm], distance [cm], view mode
     ratio_lo: vec4<f32>,  // sigma calibration ratio (measured / formula) at pyramid levels 0..3
     ratio_hi: vec4<f32>,  // ... at levels 4..7
-    disp: vec4<f32>,      // canvas width [px], canvas height [px], show gaze marker (0/1), unused
+    disp: vec4<f32>,      // canvas width [px], canvas height [px], show gaze marker (0/1), noise amp. (display mode 18)
     aux: vec4<f32>,       // display: pyramid level of the shown map, display scale, unused, cutoff
 }
 

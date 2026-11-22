@@ -72,26 +72,103 @@
                 </a>
             </div>
 
-            <div class="container-wide">
+            <div class="pam-demo pam-teaser" data-pam-demo data-base="projects/phase-aligned-metamers/realtime/">
+                <div class="pam-canvas"><canvas id="canvas"></canvas>
+                    <div id="legend" class="pam-legend" hidden><span id="legendMin"></span><div id="legendBar" class="pam-legend-bar"></div><span id="legendMax"></span><span id="legendUnit" class="pam-legend-unit"></span></div>
+                    <div id="levelBox" class="pam-seg pam-overlay pam-levels" title="pyramid level" hidden></div>
+                    <div id="maskBox" class="pam-seg pam-overlay pam-mask" title="levels included in the noise" hidden></div>
+                    <div id="fovBox" class="pam-seg pam-overlay" hidden>
+                        <button type="button" data-fov="blur" class="on" title="every pixel blurred with the Gaussian of its pyramid level (the base image of the method)">Per-Pixel Blur</button>
+                        <button type="button" data-fov="pyramid" title="blended from the pyramid levels with the masks (as a renderer with mipmaps would)">Pyramid</button>
+                        <button type="button" data-fov="diff" title="difference of the two foveations in luminance (per-pixel blur minus pyramid)">Difference</button>
+                    </div>
+                    <div id="variantBox" class="pam-seg pam-overlay" hidden>
+                        <button type="button" data-variant="measured" title="measured on the image chosen under 'Measure Statistics On'">Measured</button>
+                        <button type="button" data-variant="repaired" class="on" title="after the repair (extrapolated from coarser levels)">Repaired/Extrapolated</button>
+                    </div>
+                    <div id="enhBox" class="pam-seg pam-overlay" hidden>
+                        <button type="button" data-enh="1" class="on" title="foveated image with the synthesized noise added (our method)">Enhancement On</button>
+                        <button type="button" data-enh="0" title="foveated image only, without the noise">Enhancement Off</button>
+                    </div><div id="infoPop" class="pam-popover" role="dialog" hidden><p class="pam-status"><span id="status">Starting ...</span> <span id="frame"></span></p><p class="pam-credits">Scenes from the <a href="https://www.blender.org/download/demo-files/" target="_blank">Blender demo files</a>: Classroom by Christophe Seux (CC0); Drawn House: House of Chores by Blender Studio (CC BY); Fish: Gold by Blender Studio (CC BY); Italian Flat by Flavio Della Tommasa (CC BY); Mossy Tree: Tree, leaves and grass by Simon Thommes, Blender Studio (CC0). Face: photos from <a href="https://unsplash.com/photos/woman-holding-her-face-hHCJcg4ZxWQ" target="_blank">Unsplash</a> (Unsplash license).</p></div><div class="pam-icons"><select id="image" hidden>
+                            <option value="projects/phase-aligned-metamers/realtime/images/classroom_2k.jpg">Classroom</option>
+                            <option value="projects/phase-aligned-metamers/realtime/images/drawnhouse_2k.jpg">Drawn House</option>
+                            <option value="projects/phase-aligned-metamers/realtime/images/face_2k.jpg" selected>Face</option>
+                            <option value="projects/phase-aligned-metamers/realtime/images/fish_2k.jpg">Fish</option>
+                            <option value="projects/phase-aligned-metamers/realtime/images/italianflat_2k.jpg">Italian Flat</option>
+                            <option value="projects/phase-aligned-metamers/realtime/images/mossytree_2k.jpg">Mossy Tree</option>
+                        </select><button type="button" id="infoBtn" class="pam-fs" aria-expanded="false"></button><button type="button" id="sceneBtn" class="pam-fs"></button><button type="button" id="autoGazeBtn" class="pam-fs"></button><button type="button" id="showGazeBtn" class="pam-fs"></button><button type="button" id="fullscreen" class="pam-fs" title="Full screen (Esc to leave); the foveation follows the image's physical size" aria-label="Full screen"></button></div></div>
+                <div id="enhLevels" class="pam-thumbs" hidden></div>
+                <p id="viewNote" class="pam-note" hidden></p>
+                <div id="flow" class="pam-flow"></div>
+
+                <div class="controls pam-context">
+                    <div id="keepBox" class="pam-keep" hidden>
+                        <p class="pam-keep-note">How much of each measured statistic the synthesized noise uses (1 = as measured, 0 = a fixed random field).</p>
+                        <label class="pam-fill" title="how much of the measured statistic the noise uses: 1 = as measured, 0 = a fixed random field, in between a blend (angles on the unit circle)">
+                            <input id="keepI" type="range" min="0" max="1" step="0.05" value="1">
+                            <span class="pam-fill-text">Intensity <span id="keepIVal">1.00</span></span>
+                        </label>
+                        <label class="pam-fill" title="how much of the measured statistic the noise uses: 1 = as measured, 0 = a fixed random field, in between a blend (angles on the unit circle)">
+                            <input id="keepD" type="range" min="0" max="1" step="0.05" value="1">
+                            <span class="pam-fill-text">Orientation <span id="keepDVal">1.00</span></span>
+                        </label>
+                        <label class="pam-fill" title="how much of the measured statistic the noise uses: 1 = as measured, 0 = a fixed random field, in between a blend (angles on the unit circle)">
+                            <input id="keepP" type="range" min="0" max="1" step="0.05" value="1">
+                            <span class="pam-fill-text">Phase <span id="keepPVal">1.00</span></span>
+                        </label>
+                    </div>
+                    <label id="gainBox" hidden class="pam-fill" title="scales the added noise; 1 = as computed, 0 = foveated image only">
+                        <input id="gain" type="range" min="0" max="2" step="0.05" value="1">
+                        <span class="pam-fill-text">Noise Amp. <span id="gainVal">1.00</span></span>
+                    </label>
+                    <div id="noiseFromRow" class="pam-row pam-from-row" title="Which statistics the noise is synthesized from. Extrapolated: the repaired statistics, extrapolated from the coarser levels into the blurred ones (our method). Measured: the statistics as measured, without the repair (on the image chosen under Measure Statistics On; with Full Res this is the ground truth)." hidden>
+                        <span class="pam-row-text">Noise From</span>
+                        <span id="noiseFromBox" class="pam-seg pam-split">
+                            <button type="button" data-from="rep" class="on">Extrapolated Statistics</button>
+                            <button type="button" data-from="meas">Measured Statistics</button>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="controls pam-settings">
+                    <div class="pam-row" title="Which image the statistics are measured on. Full res: the original image, as in the paper. Foveated: the already foveated image, as a renderer would have it. This mainly changes the intensity: the Gaussian pyramid is built a second time from the foveated image, so the bands lose some more frequencies near the levels that are already blurred.">
+                        <span class="pam-row-text">Measure Statistics On</span>
+                        <span id="analyseBox" class="pam-seg pam-split">
+                            <button type="button" data-analyse="1">Foveated</button>
+                            <button type="button" data-analyse="0" class="on">Full Res (Paper)</button>
+                        </span>
+                    </div>
+                    <div class="pam-row" title="How the noise strength per level is found: a line is fitted through the standard deviation of the Laplacian bands. Paper: only the bands from the cutoff level on, which are not blurred anywhere. The line jumps when the cutoff level changes with gaze or distance. Weighted (web version, not in the paper): all bands, each measured only where its level is fully kept and weighted by that share of the image, so the fit changes smoothly with gaze and distance.">
+                        <span class="pam-row-text">Intensity Fit</span>
+                        <span id="fitBox" class="pam-seg pam-split">
+                            <button type="button" data-fit="weighted" class="on">Weighted</button>
+                            <button type="button" data-fit="cutoff">Unweighted (Paper)</button>
+                        </span>
+                        <button type="button" id="fitPlotBtn" class="pam-plotbtn" title="Show the intensity fit plot" aria-expanded="false"><svg viewBox="1 3 22 18" width="16" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16h20"/><path d="M6 16l5-5 4 3 6-7"/></svg></button>
+                    </div>
+                </div>
+
+                <div id="fitPlot" class="pam-fitplot" hidden></div>
+
+                <div class="controls pam-setup">
+                    <label class="pam-fill" title="Measure the width of the image on your screen with a ruler and set it here; with it the eccentricities are right. It is kept when you resize the window, zoom or go full screen.">
+                        <input id="imageCm" type="range" min="10" max="150" step="0.1" value="50">
+                        <span class="pam-fill-text">Image Width (Measured) <span id="imageCmVal">50.0 cm</span></span>
+                    </label>
+                    <label class="pam-fill">
+                        <input id="distance" type="range" min="30" max="200" step="1" value="50">
+                        <span class="pam-fill-text">Viewing Distance <span id="distanceVal">50 cm</span></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- static teaser: shown instead of the real-time demo when the browser has no WebGPU (main.js) -->
+            <div class="container-wide" id="pamFallback" hidden>
                 <img src="projects/phase-aligned-metamers/teaser-all_same.jpg">
+                <p class="pam-fallback-note">The real-time demo needs a browser with WebGPU (current Chrome, Edge or Safari; Firefox on Windows).</p>
                     <!-- <p>
                         <span style="font-weight: bold;">Teaser:</span> We design a broadband stimulus to accurately estimate disparity thresholds across various eccentricities and blur levels. We fit a custom surface through the retrieved threshold estimations. It shows the lowest resolvable disparity 𝑇 as a continuous function of eccentricity 𝜃 and Gaussian filter sigma 𝜎. The green line denotes the minimum 𝑇-value per eccentricity 𝜃 , encoding the amount of blur that can be induced by foveated rendering without degrading stereoscopic depth perception. We validate our findings in a validation study, by showing participants unaltered renderings vs. strongly foveated renderings.
                     </p> -->
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>Abstract</h2>
-            <p>
-                Novel display technologies can deliver high-quality images across a wide field of view, creating immersive experiences. While rendering for such devices is expensive, most of the content falls into peripheral vision, where human perception differs from that in the fovea. Consequently, it is critical to understand and leverage the limitations of visual perception to enable efficient rendering. A standard approach is to exploit the reduced sensitivity to spatial details in the periphery by reducing rendering resolution, so-called foveated rendering. While this strategy avoids rendering part of the content altogether, an alternative promising direction is to replace accurate and expensive rendering with inexpensive synthesis of content that is perceptually indistinguishable from the ground-truth image. In this paper, we propose such a method for the efficient generation of an image signal that substitutes the rendering of high-frequency details. The method is grounded in findings from image statistics, which show that preserving appropriate local statistics is critical for perceived image quality. Based on this insight, we extrapolate several local image statistics from foveated content into higher spatial frequency ranges that are attenuated or omitted in the rendering process. This rich set of statistics is later used to synthesize a signal that is added to the initial rendering, boosting its perceived quality. We focus on phase information, demonstrating the importance of its alignment across space and frequencies. We calibrate and compare our method with state-of-the-art strategies, showing a significant reduction in the content that must be accurately rendered at a relatively small extra cost for synthesizing the additional signal.
-            </p>
-        </div>
-
-        
-        <div class="section">    
-            <h2>Fast Forward</h2>
-            <div class="video">
-                <iframe style="width:100%; aspect-ratio:16/9; height:auto;" src="https://www.youtube.com/embed/u6xhzA40Af0?si=opIyZR0rUja6pN-A&amp;start=6803" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
             </div>
         </div>
 
@@ -102,44 +179,19 @@
             </div>
         </div>
 
-
         <div class="section">
-            <h2>Effect of Parameters</h2>
+            <h2>Abstract</h2>
             <p>
-                The image below shows a foveated image with an enhanced luminance channel.
-                In this particular example, the enhancement is synthesized based on image parameters that were extracted from the groundtruth image, so the enhancement is as close as possible to the real difference between the foveated image and the original image.
-                Adjust the sliders to influence how accurately the three parameters are resembled in the synthesized noise. The orange dot marks the gaze point.
+                Novel display technologies can deliver high-quality images across a wide field of view, creating immersive experiences. While rendering for such devices is expensive, most of the content falls into peripheral vision, where human perception differs from that in the fovea. Consequently, it is critical to understand and leverage the limitations of visual perception to enable efficient rendering. A standard approach is to exploit the reduced sensitivity to spatial details in the periphery by reducing rendering resolution, so-called foveated rendering. While this strategy avoids rendering part of the content altogether, an alternative promising direction is to replace accurate and expensive rendering with inexpensive synthesis of content that is perceptually indistinguishable from the ground-truth image. In this paper, we propose such a method for the efficient generation of an image signal that substitutes the rendering of high-frequency details. The method is grounded in findings from image statistics, which show that preserving appropriate local statistics is critical for perceived image quality. Based on this insight, we extrapolate several local image statistics from foveated content into higher spatial frequency ranges that are attenuated or omitted in the rendering process. This rich set of statistics is later used to synthesize a signal that is added to the initial rendering, boosting its perceived quality. We focus on phase information, demonstrating the importance of its alignment across space and frequencies. We calibrate and compare our method with state-of-the-art strategies, showing a significant reduction in the content that must be accurately rendered at a relatively small extra cost for synthesizing the additional signal.
             </p>
-            
-
-
-            <div class="viewer">
-                <img id="demoImage" src="projects/phase-aligned-metamers/tree_1024x512/tree_intensity-1.0_dir-1.0_phase-1.0.jpg">
-            </div>
-<div class="controls">
-                <label>
-                    
-                    <input type="range" id="intensity" min="0" max="1" step="0.2" value="1">
-                    Intensity
-                </label>
-
-                <label>
-                    <input type="range" id="orientation" min="0" max="1" step="0.2" value="1">
-                    Orientation
-                </label>
-
-                <label>
-                    <input type="range" id="phase" min="0" max="1" step="0.2" value="1">
-                    Phase
-                </label>
-
-                <button id="noiseToggleBtn" class="toggle-button" aria-pressed="false" type="button">
-                    Show Just Noise
-                </button>
-            </div>  
-            
         </div>
-
+        
+        <div class="section">    
+            <h2>Fast Forward</h2>
+            <div class="video">
+                <iframe style="width:100%; aspect-ratio:16/9; height:auto;" src="https://www.youtube.com/embed/u6xhzA40Af0?si=opIyZR0rUja6pN-A&amp;start=6803" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+            </div>
+        </div>
 
 
         <div class="section">    
@@ -171,41 +223,9 @@
 
 
 
-    <script>
-
-        const img = document.getElementById("demoImage");
-
-        const intensity = document.getElementById("intensity");
-        const orientation = document.getElementById("orientation");
-        const phase = document.getElementById("phase");
-        const noiseToggleBtn = document.getElementById("noiseToggleBtn");
-        let noiseActive = false;
-
-        function updateImage() {
-        const percentIntensity = Number(intensity.value).toFixed(1);
-        const percentDir = Number(orientation.value).toFixed(1);
-        const percentPhase = Number(phase.value).toFixed(1);
-        const noiseSuffix = noiseActive ? "_noise" : "";
-
-        const file =
-            `projects/phase-aligned-metamers/tree_1024x512/tree${noiseSuffix}_intensity-${percentIntensity}` +
-            `_dir-${percentDir}` +
-            `_phase-${percentPhase}.jpg`;
-
-        img.src = file;
-        
-        }
-        [intensity, orientation, phase].forEach(slider => {
-            slider.addEventListener("input", updateImage);
-        });
-        noiseToggleBtn.addEventListener("click", () => {
-            noiseActive = !noiseActive;
-            noiseToggleBtn.classList.toggle('active', noiseActive);
-            noiseToggleBtn.setAttribute('aria-pressed', noiseActive ? 'true' : 'false');
-            updateImage();
-        });
-    </script>
+    <script type="module" src="projects/phase-aligned-metamers/realtime/main.js"></script>
 
 
+    <script src="bib-copy.js" defer></script>
 </body>
 </html>

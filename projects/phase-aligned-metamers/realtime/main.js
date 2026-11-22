@@ -4,8 +4,11 @@
 //              Laplacian std + intensity fit, repair, noise synthesis, composition
 // The host logic mirrors web/test_webgpu.py, which checks every shader against the Python package.
 
-const SCREEN_WIDTH_CM = 120;   // physical display width [cm]
-const SCREEN_WIDTH_PX = 3840;  // horizontal display resolution [px]
+// Physical size of the image on the screen: the viewer measures the image's width with a ruler and enters it. That
+// gives the size of one device pixel (cm per CSS px x devicePixelRatio), which stays the same when the window is
+// resized, the page or the OS is zoomed, or the image goes full screen, so the width follows all of these.
+// Until then: a guess for a 60 cm wide monitor (about 27") at the detected resolution.
+const DEFAULT_CM_PER_DEVICE_PX = 60 / (screen.width * (window.devicePixelRatio || 1));
 const MAX_PYR_DEPTH = 5;       // as in example.ipynb: cutoff <= 4
 const ANALYSIS_LEVELS = MAX_PYR_DEPTH + 1;   // levels 0..5 (cutoff + 1 extra level for the phase repair)
 const NOISE_LEVELS = MAX_PYR_DEPTH - 1;      // noise bands for levels 0..3 (s < cutoff <= 4)
@@ -15,32 +18,34 @@ const MIN_LEVEL_SIZE = 8;      // Worm.MIN_LEVEL_SIZE
 // Pipeline stages (flowchart). Each view: display mode (display.wgsl), level = which levels the slider offers,
 // stat = statistic with the measured / repaired switch, legend = colour scale.
 const FLOW = [
-    { title: 'Viewing geometry', views: [
+    { title: 'View. Geometry', views: [
         { name: 'Eccentricity', mode: 4, legend: { map: 'inferno', min: 0, max: 40, unit: 'deg' } },
-        { name: 'Level', mode: 5, legend: { map: 'inferno', min: 0, max: 4, unit: 'pyramid level' } },
+        { name: 'Pyr. Level', mode: 5, legend: { map: 'inferno', min: 0, max: 4, unit: 'Pyramid Level' } },
         { name: 'Blur σ', mode: 6, legend: { map: 'inferno', min: 0, max: 10, unit: 'px' } },
     ] },
     { title: 'Foveation', views: [
         { name: 'Original', mode: 0, noGaze: true },
-        { name: 'Per-pixel blur', mode: 1 },
-        { name: 'Pyramid', mode: 2 },
-        { name: 'Difference', mode: 3, legend: { map: 'diverging', scale: true, unit: 'Y (blur − pyramid)' } },
+        { name: 'Foveated', fov: { blur: 1, pyramid: 2, diff: 3 } },   // per-pixel blur / from the pyramid / difference (toggle on the image)
     ] },
-    { title: 'Pyramid', views: [
-        { name: 'Image', mode: 11, level: 'pyramid' },
-        { name: 'Laplacian band', mode: 7, level: 'laplace', legend: { map: 'gray', scale: true, unit: 'Y' } },
+    { title: 'Image Pyramids', toFoveated: true, views: [
+        { name: 'Image', mode: 11, level: 'pyramid', thumbs: true },
+        { name: 'Laplacian Band', mode: 7, level: 'laplace', thumbs: true, note: () => state.analyseFoveated
+            ? 'Note how the fine levels (L0, L1, …) only have content around the gaze point: in the periphery they are plain grey, '
+              + 'without detail. This lost detail is what our enhancement recovers.'
+            : 'These are the bands of the full-res original, so they have detail everywhere. Switch "Measure Statistics On" to '
+              + 'Foveated to see how foveation removes the fine levels in the periphery, the detail our enhancement recovers.',
+          legend: { map: 'gray', scale: true, unit: 'Y' } },
     ] },
-    { title: 'Statistics', views: [
+    { title: 'Statistics', toFoveated: true, views: [
+        { name: 'Intensity', stat: { measured: 10, repaired: 12 }, level: 'analysis', legend: { map: 'warm', scale: true, positive: true, unit: '|G + iH| · Modulator' } },
         { name: 'Orientation', stat: { measured: 8, repaired: 13 }, level: 'analysis', legend: { map: 'cyclic', min: -90, max: 90, unit: 'deg' } },
         { name: 'Phase', stat: { measured: 9, repaired: 14 }, level: 'analysis', legend: { map: 'cyclic', min: -180, max: 180, unit: 'deg' } },
-        { name: 'Intensity', stat: { measured: 10, repaired: 12 }, level: 'analysis', legend: { map: 'inferno', scale: true, positive: true, unit: '|G + iH| · modulator' } },
     ] },
     { title: 'Noise', views: [
-        { name: 'Band', mode: 17, level: 'noise', legend: { map: 'gray', scale: true, unit: 'std of the band' } },
-        { name: 'Enhancement', mode: 16, levels: true, legend: { map: 'gray', scale: true, unit: 'Y' } },
+        { name: 'Enhancement', mode: 16, levels: true, keep: true, amp: true, legend: { map: 'gray', scale: true, unit: 'Y' } },
     ] },
     { title: 'Result', views: [
-        { name: 'Final image', mode: 15, gain: true },
+        { name: 'Final Image', mode: 15, gain: true, keep: true, uniform: true },
     ] },
 ];
 
@@ -54,25 +59,35 @@ const status = (msg, isError = false) => {
     errorShown = errorShown || isError;
     $('status').textContent = msg;
     $('status').classList.toggle('error', isError);
+    const pop = document.getElementById('infoPop');   // the status lives in the (i) popover: show errors right away
+    if (isError && pop) pop.hidden = false;
 };
 
 const state = {
     stage: 5, view: 0,      // selected flowchart node and view
-    variant: 'measured',    // statistics: measured / repaired
+    variant: 'repaired',    // statistics: measured / repaired
+    fovMethod: 'blur',      // foveated view: per-pixel blur / from the pyramid / their difference
     level: 0,               // pyramid level of the level views
     gaze: null,             // [row, col] in image pixels
     frozen: false,          // click on the image freezes the gaze
     pointerInside: false,
     autoGaze: true,         // slow automatic eye movement while the mouse is outside the image
-    motion: false,          // moving input: the image is translated every frame (temporal stability test)
     distance: 50,           // viewing distance [cm]
-    uniformLevel: -1,       // < 0: eccentricity-dependent foveation
+    uniformLevel: -1,       // Final Image: < 0 eccentricity-dependent foveation, else one level for the whole image
     showGaze: true,
-    analyseFoveated: true,  // statistics measured on the foveated image (false: on the full-res original, as in the paper)
+    analyseFoveated: false, // statistics measured on the full-res original (as in the paper; default) or the foveated
+                            // image; switches to foveated on entering the Image Pyramids or Statistics stage
     fitWeighted: true,      // intensity fit: weighted over all bands (web version) or from the cutoff on (paper)
     enhLevel: -1,           // Enhancement view: -1 = sum of all levels, s = contribution of level s only
     gain: 1,                // noise gain of the "Final image" view (1 = as computed, 0 = no noise)
+    enhOn: true,            // Final Image: enhancement on (foveated + noise) / off (foveated image only)
+    levelOn: [true, true, true, true],   // Enhancement / Final Image with "All": which levels' noise is included
+    noiseFrom: 'rep',       // noise synthesized from the extrapolated (repaired, 'rep') or the measured ('meas') statistics
+    keep: [1, 1, 1],        // effect of the parameters: share of the measured intensity, orientation, phase kept in the
+                            // noise (1 = as measured, 0 = random; NoiseGenerator.generate_noise keep_*)
     gpuInfo: null,          // last read-back of the intensity fit and the Laplacian std (for info line and legends)
+    cmPerDevicePx: DEFAULT_CM_PER_DEVICE_PX,   // physical size of one device pixel [cm], from the measured image width
+    cssWidth: 0,            // width of the shown image on the page [CSS px]
 };
 
 async function loadText(url) {
@@ -90,16 +105,32 @@ function inferno(t) {
         [25.13112622477341, -12.24266895238567, -23.07032500287172]];
     return [0, 1, 2].map((k) => Math.min(Math.max(c[0][k] + t * (c[1][k] + t * (c[2][k] + t * (c[3][k] + t * (c[4][k] + t * (c[5][k] + t * c[6][k]))))), 0), 1));
 }
-const cyclic = (t) => [0, 1 / 3, 2 / 3].map((o) => 0.5 + 0.45 * Math.cos(2 * Math.PI * (t + o)));
-function diverging(v) {
-    const mix = (a, b, f) => a.map((x, i) => x + (b[i] - x) * f);
-    return v < 0 ? mix([1, 1, 1], [0.13, 0.40, 0.67], -v) : mix([1, 1, 1], [0.70, 0.09, 0.17], v);
-}
+// sequential colour map from the project colours: near-black #1d1216 -> dark crimson #6e072c -> crimson #bf0c4c -> salmon #dd8a78 -> beige #f1efe3, brightness increasing throughout (linear in sRGB); as warm() in display.wgsl
+const WARM_STOPS = [[0.114, 0.071, 0.086], [0.431, 0.027, 0.173], [0.749, 0.047, 0.298], [0.867, 0.541, 0.471], [0.945, 0.937, 0.890]];
+const warm = (t) => {
+    const x = Math.min(Math.max(t, 0), 1) * 4, i = Math.min(Math.floor(x), 3), f = x - i;
+    return WARM_STOPS[i].map((v, k) => v + (WARM_STOPS[i + 1][k] - v) * f);
+};
+// diverging colour map from the project colours: slate blue #5b7088 (-1) - beige #f1efe3 (0) - crimson #bf0c4c (+1); as diverging() in display.wgsl (t in [0, 1])
+const diverging = (t) => {
+    const v = Math.min(Math.max(2 * t - 1, -1), 1), mid = [0.945, 0.937, 0.890];
+    const end = v < 0 ? [0.357, 0.439, 0.533] : [0.749, 0.047, 0.298];
+    return mid.map((m, k) => m + (end[k] - m) * Math.abs(v));
+};
+// legend of the difference view (Foveated: Difference)
+const DIFF_LEGEND = { map: 'diverging', scale: true, unit: 'Y (Blur − Pyramid)' };
+// cyclic colour map for angles, from the project colours, around the circle: beige #f1efe3 -> crimson #bf0c4c -> dark #2b1a22 -> slate blue #5b7088 -> beige (linear in sRGB); as cyclic() in display.wgsl
+const CYCLIC_STOPS = [[0.945, 0.937, 0.890], [0.749, 0.047, 0.298], [0.169, 0.102, 0.133], [0.357, 0.439, 0.533]];
+const cyclic = (t) => {
+    const x = (t - Math.floor(t)) * 4, i = Math.min(Math.floor(x), 3), f = x - i;
+    const a = CYCLIC_STOPS[i], b = CYCLIC_STOPS[(i + 1) % 4];
+    return a.map((v, k) => v + (b[k] - v) * f);
+};
 function gradient(map) {
     const stops = [];
     for (let i = 0; i <= 16; i++) {
         const t = i / 16;
-        const rgb = map === 'inferno' ? inferno(t) : map === 'cyclic' ? cyclic(t) : map === 'diverging' ? diverging(2 * t - 1) : [t, t, t];
+        const rgb = map === 'inferno' ? inferno(t) : map === 'cyclic' ? cyclic(t) : map === 'warm' ? warm(t) : map === 'diverging' ? diverging(t) : [t, t, t];
         stops.push(`rgb(${rgb.map((x) => Math.round(255 * x)).join(',')}) ${(100 * t).toFixed(1)}%`);
     }
     return `linear-gradient(to right, ${stops.join(', ')})`;
@@ -109,6 +140,11 @@ const fmt = (v) => (Math.abs(v) >= 100 || v === 0 ? v.toFixed(0) : Math.abs(v) >
 async function main() {
     if (!navigator.gpu) {
         status('This browser does not support WebGPU. Use a current Chrome, Edge or Safari (or Firefox on Windows).', true);
+        const fallback = document.getElementById('pamFallback');   // the page's static teaser image, if it has one
+        if (fallback) {
+            fallback.hidden = false;
+            document.querySelector('[data-pam-demo]').hidden = true;
+        }
         return;
     }
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
@@ -119,7 +155,7 @@ async function main() {
 
     const names = ['common', 'sampling', 'ycbcr', 'blur', 'foveate', 'foveate_pyramid', 'pyramid_down', 'laplace',
                    'analysis_filters', 'analysis_orient', 'lap_stats', 'lap_finalize', 'fit', 'repair_common', 'repair_init', 'repair_phi', 'repair_level',
-                   'noise_band', 'noise_stats', 'noise_finalize', 'compose', 'display', 'shift'];
+                   'noise_band', 'noise_stats', 'noise_finalize', 'compose', 'display'];
     const src = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await loadText(`${BASE}shaders/${n}.wgsl`)])));
     const consts = await (await fetch(`${BASE}constants.json`)).json();
     const code = (...parts) => parts.map((p) => src[p]).join('\n');
@@ -146,7 +182,6 @@ async function main() {
 
     const P = {
         ycbcr: computePipeline(code('ycbcr'), [tex(0, 'float'), storage(1, 'rgba32float')]),
-        shift: computePipeline(code('shift'), [uniform(0), tex(1), storage(2, 'rgba32float')]),
         blurV: computePipeline(code('blur'), [uniform(0), tex(1), storage(2, 'rgba32float')], 'blur_v'),
         blurH: computePipeline(code('blur'), [uniform(0), tex(1), storage(2, 'rgba32float'), storage(3, 'rgba16float')], 'blur_h'),
         down: computePipeline(code('sampling', 'pyramid_down'), [roStorage(0), tex(1), storage(2, 'rgba32float')]),
@@ -165,7 +200,7 @@ async function main() {
         repInit: computePipeline(code('sampling', 'repair_common', 'repair_init'), [uniform(0), tex(1), storage(2, 'rgba32float'), roStorage(15)]),
         repPhi: computePipeline(code('sampling', 'repair_common', 'repair_phi'), [uniform(0), ...texs(1, 4), storage(5, 'rgba32float')]),
         repLevel: computePipeline(code('sampling', 'repair_common', 'repair_level'), [uniform(0), ...texs(1, 5), storage(6, 'rgba32float'), roStorage(15)]),
-        band: computePipeline(code('noise_band'), [uniform(0), roStorage(1), tex(2), storage(3, 'r32float')]),
+        band: computePipeline(code('noise_band'), [uniform(0), roStorage(1), tex(2), storage(3, 'r32float'), roStorage(4)]),
         compose: computePipeline(code('common', 'sampling', 'compose'),
             [uniform(0), uniform(1), ...texs(2, 8), roStorage(9), storage(10, 'rgba32float'), roStorage(11)]),
     };
@@ -201,6 +236,7 @@ async function main() {
     const bandStdsBuffer = device.createBuffer({ size: 32, usage: GPUBufferUsage.STORAGE });
     const lapStatsBuffer = device.createBuffer({ size: 64, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });   // (std, weight) per band
     const fitBuffer = device.createBuffer({ size: 48, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+    const repStdBuffer = device.createBuffer({ size: 64, usage: GPUBufferUsage.STORAGE });   // (std of intensity_rep, 1) per level
     const readback = device.createBuffer({ size: 112, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     let readbackBusy = false;
 
@@ -230,8 +266,12 @@ async function main() {
         const ratio = consts.ratios[i] * (1 - f) + consts.ratios[Math.min(i + 1, 7)] * f;
         return consts.sigma0 * Math.sqrt((Math.pow(4, L) - 1) / 3) * ratio;
     }
+    // image pixels per cm on the monitor
+    const shownDevicePx = () => state.cssWidth * (window.devicePixelRatio || 1);   // image width in device px
+    const imageWidthCm = () => shownDevicePx() * state.cmPerDevicePx;
+    const pxPerCm = () => img.w / Math.max(imageWidthCm(), 1e-3);
     function eccentricity(row, col) {
-        const ppc = SCREEN_WIDTH_PX / SCREEN_WIDTH_CM;
+        const ppc = pxPerCm();
         const cm = (r, c) => [(r - (img.h - 1) / 2) / ppc, (c - (img.w - 1) / 2) / ppc];
         const [py, px] = cm(row, col), [gy, gx] = cm(state.gaze[0], state.gaze[1]);
         const a = [py, px, state.distance], b = [gy, gx, state.distance];   // vectors from the eye (centred viewer)
@@ -249,8 +289,8 @@ async function main() {
     // The highest eccentricity lies on the image border, which is sampled here.
     function cutoff() {
         let maxLevel = 0;
-        if (state.uniformLevel >= 0) {
-            maxLevel = state.uniformLevel;
+        if (uniformLevel() >= 0) {
+            maxLevel = uniformLevel();
         } else {
             const step = 4;
             for (let c = 0; c < img.w; c += step) {
@@ -289,9 +329,7 @@ async function main() {
 
         img.src = make(w, h, 'rgba8unorm', U.TEXTURE_BINDING | U.COPY_DST | U.RENDER_ATTACHMENT);
         device.queue.copyExternalImageToTexture({ source: bmp }, { texture: img.src }, [w, h]);
-        img.base = make(w, h, 'rgba32float');   // YCbCr of the loaded image
-        img.ycc = make(w, h, 'rgba32float');    // input of the pipeline: the base image, shifted when the image moves
-        // kept for the moving input, which rebuilds the blur stack every frame
+        img.ycc = make(w, h, 'rgba32float');
         const tmp = make(w, h, 'rgba32float'), ping = make(w, h, 'rgba32float'), pong = make(w, h, 'rgba32float');
         img.stack = make(w, h, 'rgba16float', U.TEXTURE_BINDING | U.STORAGE_BINDING, maxLayer + 1);
         for (const k of ['maps', 'fov', 'fovPyr', 'final']) img[k] = make(w, h, 'rgba32float');
@@ -322,11 +360,10 @@ async function main() {
         img.orig.build = pyramidGroups(img.orig, img.ycc);
         img.fovSet.build = pyramidGroups(img.fovSet, img.fov);   // base image: per-pixel blur, as the Python pipeline
 
-        // ---- input: base image, shifted by img.offset (moving input); blur stack of the input (bind groups)
-        img.offset = [0, 0];
-        img.shiftU = uniformBuffer(16);
-        buffers.push(img.shiftU);
-        img.bg = { shift: bg(P.shift, [img.shiftU, img.base, img.ycc]), blur: [] };
+        // ---- per-image computation: YCbCr, blur stack, pyramid and analysis of the original
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginComputePass();
+        run(pass, P.ycbcr, bg(P.ycbcr, [img.src, img.ycc]), w, h);
         let cur = img.ycc;
         for (let k = 1; k <= maxLayer; k++) {
             const sigma = Math.sqrt(k * k - (k - 1) * (k - 1));
@@ -335,21 +372,16 @@ async function main() {
             new Float32Array(ab, 0, 1)[0] = sigma;
             new Int32Array(ab, 4, 1)[0] = Math.trunc(2 * sigma + 0.5);
             ub.unmap();
-            buffers.push(ub);
             const next = cur === ping ? pong : ping;
-            img.bg.blur.push([bg(P.blurV, [ub, cur, tmp]),
-                bg(P.blurH, [ub, tmp, next, img.stack.createView({ dimension: '2d', baseArrayLayer: k, arrayLayerCount: 1 })])]);
+            run(pass, P.blurV, bg(P.blurV, [ub, cur, tmp]), w, h);
+            run(pass, P.blurH, bg(P.blurH, [ub, tmp, next, img.stack.createView({ dimension: '2d', baseArrayLayer: k, arrayLayerCount: 1 })]), w, h);
             cur = next;
         }
-
-        // ---- per-image computation: YCbCr, input, blur stack, pyramid and analysis of the original
-        const encoder = device.createCommandEncoder();
-        const pass = encoder.beginComputePass();
-        run(pass, P.ycbcr, bg(P.ycbcr, [img.src, img.base]), w, h);
-        buildInput(pass);
+        buildPyramid(pass, img.orig, img.orig.build);
         pass.end();
         device.queue.submit([encoder.finish()]);
         await device.queue.onSubmittedWorkDone();
+        [tmp, ping, pong].forEach((t) => t.destroy());
 
         // ---- per-frame resources and bind groups
         img.rep = img.sizes.slice(0, nAnalysis).map((s) => make(...s, 'rgba32float'));
@@ -362,12 +394,13 @@ async function main() {
         };
         const groups16 = ([sw, sh]) => [Math.ceil(sw / 16), Math.ceil(sh / 16)];
 
+        img.bandU = img.bands.map(() => { const u = uniformBuffer(32); buffers.push(u); return u; });   // BandParams per level
         const lvViews = [0, 1, 2, 3, 4, 5].map((i) => img.orig.levels[Math.min(i, nLevels - 1)]);
-        Object.assign(img.bg, {
+        img.bg = {
             foveate: bg(P.foveate, [paramsBuffer, img.ycc, img.stack.createView({ dimension: '2d-array' }), img.maps, img.fov]),
             foveatePyr: bg(P.foveatePyr, [paramsBuffer, ...lvViews, img.fovPyr]),
             fit: bg(P.fit, [fitParamsBuffer, lapStatsBuffer, fitBuffer]),
-            band: img.bands.map((b, s) => bg(P.band, [fixedUniform([h, w, 0, 0]), filterBuffer, img.rep[s], b])),
+            band: img.bands.map((b, s) => bg(P.band, [img.bandU[s], filterBuffer, img.rep[s], b, repStdBuffer])),
             bandStats: img.bands.map((b, s) => {
                 const [gx, gy] = groups16([w, h]), part = partial(gx, gy);
                 return { groups: [gx, gy],
@@ -376,7 +409,7 @@ async function main() {
             }),
             compose: bg(P.compose, [paramsBuffer, composeBuffer, img.maps, img.fov, img.fovPyr,
                 ...[0, 1, 2, 3].map((s) => img.bands[Math.min(s, img.bands.length - 1)]), bandStdsBuffer, img.final, fitBuffer]),
-        });
+        };
         // bind groups that depend on the analysed set
         const lapParts = img.sizes.slice(0, nLevels - 1).map((s) => {
             const [gx, gy] = groups16(s);
@@ -385,6 +418,12 @@ async function main() {
             return { groups: [gx, gy], buf: b, statsU: uniformBuffer(16), finalizeU: uniformBuffer(16) };
         });
         img.lapParts = lapParts;
+        // effect of the parameters: plain std of intensity_rep per noise level (lap_stats / lap_finalize, unweighted)
+        img.bg.repStd = img.bands.map((_, s) => ({
+            groups: lapParts[s].groups,
+            stats: bg(P.lapStats, [fixedUniform([s, lapParts[s].groups[0], 0, 0]), img.rep[s], img.maps, lapParts[s].buf]),
+            finalize: bg(P.lapFinalize, [fixedUniform([lapParts[s].groups[0] * lapParts[s].groups[1], s, 0, 0]), lapParts[s].buf, repStdBuffer]),
+        }));
         for (const set of [img.orig, img.fovSet]) {
             set.lapStats = set.laplace.map((lap, i) => ({
                 groups: lapParts[i].groups,
@@ -406,24 +445,6 @@ async function main() {
         requestRender();
     }
 
-    // Input of the pipeline: the base image shifted by img.offset, its blur stack (layer k: sigma = k, built
-    // incrementally) and the pyramid and analysis of the original. Once per image, or every frame when the image moves.
-    function buildInput(pass) {
-        device.queue.writeBuffer(img.shiftU, 0, new Float32Array([img.offset[0], img.offset[1], 0, 0]));
-        run(pass, P.shift, img.bg.shift, img.w, img.h);
-        for (const [v, hz] of img.bg.blur) {
-            run(pass, P.blurV, v, img.w, img.h);
-            run(pass, P.blurH, hz, img.w, img.h);
-        }
-        buildPyramid(pass, img.orig, img.orig.build);
-    }
-    // moving input: a slow circle of 48 px radius, one round in 12 s (about 25 px/s), in whole pixels
-    function motionOffset(t) {
-        if (!state.motion) return [0, 0];
-        const a = 2 * Math.PI * (t / 1000) / 12;
-        return [Math.round(48 * Math.cos(a)) - 48, Math.round(48 * Math.sin(a))];
-    }
-
     function buildPyramid(pass, set, groups) {   // Gaussian pyramid, Laplacian bands and analysis of one set
         for (let i = 1; i < img.nLevels; i++) run(pass, P.down, groups.down[i], ...img.sizes[i]);
         for (let i = 0; i < img.nLevels - 1; i++) run(pass, P.laplace, groups.laplace[i], ...img.sizes[i]);
@@ -435,34 +456,39 @@ async function main() {
 
     // ---------------------------------------------------------------- views
     const currentView = () => FLOW[state.stage].views[state.view];
+    // level toggles apply in Enhancement and Final Image while "All" is selected
+    const maskActive = () => { const v = currentView(); return (v.levels && state.enhLevel < 0) || (v.uniform && state.uniformLevel < 0); };
+    const excludedBits = () => (maskActive() ? state.levelOn.reduce((b, on, s) => b | (on ? 0 : 1 << s), 0) : 0);
+    // uniform level only applies in the Final Image view (its level buttons); all other views foveate by eccentricity
+    const uniformLevel = () => (currentView().uniform ? state.uniformLevel : -1);
     function currentMode() {
         const v = currentView();
         if (v.levels) return state.enhLevel >= 0 ? 18 : 16;   // Enhancement: sum, or the contribution of one level
+        if (v.fov) return v.fov[state.fovMethod];
         if (!v.stat) return v.mode;
         return state.variant === 'repaired' ? v.stat.repaired : v.stat.measured;
     }
     const activeSet = () => (state.analyseFoveated ? img.fovSet : img.orig);
     function levelCount(kind) {
-        return { pyramid: img.nLevels, laplace: img.nLevels - 1, noise: NOISE_LEVELS, analysis: img.nAnalysis }[kind] || 1;
+        return { pyramid: img.nLevels, laplace: img.nLevels - 1, analysis: img.nAnalysis }[kind] || 1;
     }
-    function auxTexture() {
-        const v = currentView(), set = activeSet(), l = state.level;
+    const hasThumbs = (v) => v.levels || v.thumbs;   // L0..L3 thumbnails under the image
+    function auxTexture(l = state.level) {
+        const v = currentView(), set = activeSet();
         if (v.levels && state.enhLevel >= 0) return img.bands[state.enhLevel];
         switch (v.level) {
             case 'pyramid': return l === 0 ? (state.analyseFoveated ? img.fov : img.ycc) : set.levels[l];
             case 'laplace': return set.laplace[l];
-            case 'noise': return img.bands[l];
             case 'analysis': return state.variant === 'repaired' ? img.rep[l] : set.analysis[l];
             default: return set.analysis[0];
         }
     }
-    function displayScale() {
-        const mode = currentMode(), l = state.level;
+    function displayScale(mode = currentMode(), l = state.level) {
         const lap = state.gpuInfo ? state.gpuInfo.lapStds : [];
         const mods = state.gpuInfo ? state.gpuInfo.mods : [];
         const s = lap[Math.min(l, lap.length - 1)] || 0.02;
         switch (mode) {
-            case 3: return 20;                                         // difference of the two foveations
+            case 3: return 20;                                         // difference of the two foveations: +-0.05
             case 7: return 0.15 / s;                                   // Laplacian: +-3.3 std -> full grey range
             // |G + iH| of the steered filters lies in about [0, 1] at every level (99th percentile 0.6 - 0.9), roughly
             // 10x the Laplacian std, so the intensity views map |G + iH| = MAG_MAX to the top of the colour scale
@@ -475,24 +501,33 @@ async function main() {
                 return mode === 10 ? (mods[l] || 0) / top : 1 / top;   // measured view shows |G + iH| (unmodulated)
             }
             case 16: case 18: return 4;                                // noise enhancement around mid-grey
-            case 17: return 0.15;                                      // noise band, normalized by its std
             default: return 1;
         }
     }
+    // Range [min, max] that the display maps to the full colour scale, for display mode `mode` at level l
+    function legendRange(lg, mode, l) {
+        if (!lg.scale) return [lg.min, lg.max];
+        const k = displayScale(mode, l);
+        if (mode === 3) return [-1 / k, 1 / k];         // diverging map over [-1, 1]
+        if (!lg.positive) return [-0.5 / k, 0.5 / k];
+        const mod = state.gpuInfo ? state.gpuInfo.mods[l] || 0 : 0;
+        return [0, mode === 10 ? mod / k : 1 / k];   // measured view shows |G + iH|; label it as intensity
+    }
+    // The min label has a fixed width per view (the widest it gets over the view's levels and variants, and the widest
+    // seen so far), so the bar does not move while clicking through levels, only when switching to another view.
+    const legendMinChars = {};
     function updateLegend() {
-        const v = currentView(), lg = v.legend;
+        const v = currentView(), lg = v.fov && state.fovMethod === 'diff' ? DIFF_LEGEND : v.legend;
         $('legend').hidden = !lg;
         if (!lg) return;
-        let min = lg.min, max = lg.max;
-        if (lg.scale) {   // range that the display maps to the full colour scale
-            const k = displayScale(), mode = currentMode();
-            if (mode === 3) { min = -1 / k; max = 1 / k; }
-            else if (lg.positive) {
-                min = 0;
-                const mod = state.gpuInfo ? state.gpuInfo.mods[state.level] || 0 : 0;
-                max = mode === 10 ? mod / k : 1 / k;    // measured view shows |G + iH|; label it as intensity
-            } else { min = -0.5 / k; max = 0.5 / k; }
-        }
+        const [min, max] = legendRange(lg, currentMode(), state.level);
+        const key = `${state.stage}/${state.view}/${v.fov ? state.fovMethod : ''}`;
+        const levels = v.level && img ? levelCount(v.level) : 1;
+        const modes = v.stat ? [v.stat.measured, v.stat.repaired] : [currentMode()];
+        let chars = legendMinChars[key] || 0;
+        for (let l = 0; l < levels; l++) for (const m of modes) chars = Math.max(chars, fmt(legendRange(lg, m, l)[0]).length);
+        legendMinChars[key] = chars;
+        $('legendMin').style.width = `${chars}ch`;
         $('legendBar').style.background = gradient(lg.map);
         $('legendMin').textContent = fmt(min);
         $('legendMax').textContent = fmt(max);
@@ -502,17 +537,67 @@ async function main() {
         document.querySelectorAll('.node').forEach((n, i) => n.classList.toggle('active', i === state.stage));
         document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', +c.dataset.stage === state.stage && +c.dataset.view === state.view));
         const v = currentView();
-        $('levelBox').hidden = !v.level;
-        if (v.level && img) {
-            const n = levelCount(v.level);
-            state.level = Math.min(state.level, n - 1);
-            $('level').max = n - 1;
-            $('level').value = state.level;
-            $('levelVal').textContent = `L${state.level}`;
+        // level buttons in the top-right corner of the image:
+        //   level views:  L0 .. L(n-1)                          -> state.level
+        //   Enhancement:  L0 .. L3 (contribution of one level), All (sum)               -> state.enhLevel (-1 = all)
+        //   Final Image:  L0 .. L4 = the whole image at that level (uniform), All (foveated by eccentricity)
+        //                                                                               -> state.uniformLevel (-1 = all)
+        //   With All, a column of level toggles drops down under it (#maskBox): which levels' noise is included.
+        const bar = $('levelBox');
+        const spec = v.levels ? { all: true, n: NOISE_LEVELS, key: 'enhLevel', tip: 'All: the summed enhancement; Lk: the contribution of level k' }
+            : v.uniform ? { all: true, n: 5, key: 'uniformLevel', tip: 'All: foveated by eccentricity; Lk: the whole image at pyramid level k (uniform), with its noise' }
+            : v.level && img ? { all: false, n: levelCount(v.level), key: 'level', tip: 'pyramid level' } : null;
+        bar.hidden = !spec || !img;
+        if (spec && img) {
+            if (spec.key === 'level') state.level = Math.min(state.level, spec.n - 1);
+            const labels = Array.from({ length: spec.n }, (_, i) => `L${i}`).concat(spec.all ? ['All'] : []);
+            const value = (k) => (k < spec.n ? k : -1);   // button index -> state value (All, the last one: -1)
+            bar.title = spec.tip;
+            if (bar.dataset.labels !== labels.join() + spec.key) {
+                bar.dataset.labels = labels.join() + spec.key;
+                bar.innerHTML = '';
+                labels.forEach((text, k) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = text;
+                    btn.addEventListener('click', () => { state[spec.key] = value(k); updateControls(); requestRender(); });
+                    bar.appendChild(btn);
+                });
+            }
+            [...bar.children].forEach((btn, k) => btn.classList.toggle('on', value(k) === state[spec.key]));
+        }
+        const maskBox = $('maskBox');
+        maskBox.hidden = !maskActive();
+        if (!maskBox.hidden) {
+            if (!maskBox.childElementCount) {
+                for (let s = 0; s < NOISE_LEVELS; s++) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = `L${s}`;
+                    btn.addEventListener('click', () => { state.levelOn[s] = !state.levelOn[s]; updateControls(); requestRender(); });
+                    maskBox.appendChild(btn);
+                }
+            }
+            [...maskBox.children].forEach((btn, s) => {
+                btn.classList.toggle('on', state.levelOn[s]);
+                btn.title = `${state.levelOn[s] ? 'Leave out' : 'Include'} the noise of level ${s}`;
+            });
+            // the column hangs from the All button (the last one of the bar)
+            const allBtn = bar.lastElementChild;
+            if (allBtn) maskBox.style.width = `${allBtn.offsetWidth}px`;
         }
         $('variantBox').hidden = !v.stat;
-        $('gainBox').hidden = !v.gain;
-        $('enhLevels').hidden = !v.levels;
+        $('fovBox').hidden = !v.fov;
+        $('enhBox').hidden = !v.gain;   // Final Image: Enhancement On / Off (top left)
+        document.querySelectorAll('#enhBox button').forEach((b) => b.classList.toggle('on', +b.dataset.enh === +state.enhOn));
+        document.querySelectorAll('#fovBox button').forEach((b) => b.classList.toggle('on', b.dataset.fov === state.fovMethod));
+        $('gainBox').hidden = !(v.gain || v.amp);   // Noise Amp.: Final Image and Enhancement
+        $('keepBox').hidden = !v.keep;
+        $('noiseFromRow').hidden = true;   // hidden toggle: Shift + M or ?noise=measured (see below)
+        document.querySelectorAll('#noiseFromBox button').forEach((b) => b.classList.toggle('on', b.dataset.from === state.noiseFrom));
+        $('enhLevels').hidden = !hasThumbs(v);
+        $('viewNote').hidden = !v.note;                 // explanatory note under the image for some views
+        if (v.note) $('viewNote').textContent = v.note();
         document.querySelectorAll('#variantBox button').forEach((b) => b.classList.toggle('on', b.dataset.variant === state.variant));
         document.querySelectorAll('#analyseBox button').forEach((b) => b.classList.toggle('on', +b.dataset.analyse === +state.analyseFoveated));
         updateLegend();
@@ -526,6 +611,7 @@ async function main() {
         requestAnimationFrame(render);
     }
 
+    let autoClock = 0, lastFrameT = null;   // time [ms] of the automatic eye movement, last animated frame
     function autoGaze(t) {   // slow, smooth eye movement on a lying figure eight (Lissajous 1:2) while the mouse is outside the image
         const a = 2 * Math.PI * (t / 1000) / 20;   // one loop in 20 s
         return [img.h * (0.5 + 0.28 * Math.sin(2 * a)), img.w * (0.5 + 0.36 * Math.sin(a))];
@@ -534,22 +620,30 @@ async function main() {
     function render(t) {
         pending = false;
         const t0 = performance.now();
-        const animate = (!state.frozen && !state.pointerInside && state.autoGaze) || state.motion;
-        if (!state.frozen && !state.pointerInside) state.gaze = state.autoGaze ? autoGaze(t) : [img.h / 2, img.w / 2];
+        // automatic eye movement while the mouse is outside the image; its clock only runs while it moves, so after a
+        // pause it continues from where it stopped (paused: the gaze stays where it is)
+        const animate = !state.frozen && !state.pointerInside && state.autoGaze;
+        if (animate) {
+            autoClock += lastFrameT === null ? 0 : t - lastFrameT;
+            state.gaze = autoGaze(autoClock);
+        }
+        lastFrameT = animate ? t : null;
 
         const c = cutoff();
         const set = activeSet();
         const nLap = img.nLevels - 1;
         const r = consts.ratios;
+        // noise amp.: Final Image (0 when the enhancement is off) and Enhancement; 1 elsewhere
+        const gain = currentView().gain ? (state.enhOn ? state.gain : 0) : currentView().amp ? state.gain : 1;
         device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([
-            img.w, img.h, SCREEN_WIDTH_PX / SCREEN_WIDTH_CM, consts.sigma0,
-            state.gaze[0], state.gaze[1], state.uniformLevel, img.maxLayer,
+            img.w, img.h, pxPerCm(), consts.sigma0,
+            state.gaze[0], state.gaze[1], uniformLevel(), img.maxLayer,
             0, 0, state.distance, currentMode(),
             r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7],
-            canvas.width, canvas.height, state.showGaze && !currentView().noGaze ? 1 : 0, 0,
+            canvas.width, canvas.height, state.showGaze && !currentView().noGaze ? 1 : 0, gain,
             currentMode() === 18 ? state.enhLevel : state.level, displayScale(), 0, c,
         ]));
-        device.queue.writeBuffer(composeBuffer, 0, new Float32Array([c, 0, currentView().gain ? state.gain : 1, 0]));   // base: per-pixel blur
+        device.queue.writeBuffer(composeBuffer, 0, new Float32Array([c, 0, gain, excludedBits()]));   // base: per-pixel blur
         const wf = state.fitWeighted ? 1 : 0;
         device.queue.writeBuffer(fitParamsBuffer, 0, new Float32Array([c, nLap, wf, 0]));
         img.lapParts.forEach((lp, i) => {
@@ -560,11 +654,6 @@ async function main() {
         const encoder = device.createCommandEncoder();
         const pass = encoder.beginComputePass();
         const [w, h] = [img.w, img.h];
-        const off = motionOffset(t);
-        if (off[0] !== img.offset[0] || off[1] !== img.offset[1]) {   // moved (or motion switched off): new input
-            img.offset = off;
-            buildInput(pass);
-        }
         run(pass, P.foveate, img.bg.foveate, w, h);
         run(pass, P.foveatePyr, img.bg.foveatePyr, w, h);
         if (state.analyseFoveated) buildPyramid(pass, img.fovSet, img.fovSet.build);
@@ -574,14 +663,22 @@ async function main() {
             runGroups(pass, P.lapFinalize, ls.finalize, 1, 1);
         }
         runGroups(pass, P.fit, img.bg.fit, 1, 1);
-        // repair: levels >= cutoff keep their measured statistics; below, from coarse to fine
-        for (let s = c; s < img.nAnalysis; s++) run(pass, P.repInit, set.repInit[s], ...img.sizes[s]);
-        for (let s = c - 1; s >= 0; s--) {
+        // repair: levels >= cutoff keep their measured statistics; below, from coarse to fine.
+        // Noise from the measured statistics: every level keeps its measured statistics (no extrapolation).
+        const fromMeasured = state.noiseFrom === 'meas';
+        for (let s = fromMeasured ? 0 : c; s < img.nAnalysis; s++) run(pass, P.repInit, set.repInit[s], ...img.sizes[s]);
+        for (let s = fromMeasured ? -1 : c - 1; s >= 0; s--) {
             run(pass, P.repPhi, set.repPhi[s], ...img.sizes[s + 1]);
             run(pass, P.repLevel, set.repLevel[s], ...img.sizes[s]);
         }
         // noise bands of the levels below the cutoff, their std at full resolution, composition
+        const randomize = Math.min(...state.keep) < 1 ? 1 : 0;
         for (let s = 0; s < Math.min(c, img.bands.length); s++) {
+            device.queue.writeBuffer(img.bandU[s], 0, new Float32Array([h, w, s, randomize, ...state.keep, 0]));
+            if (randomize) {   // the random intensity is scaled by the std of the level's intensity_rep
+                runGroups(pass, P.lapStats, img.bg.repStd[s].stats, ...img.bg.repStd[s].groups);
+                runGroups(pass, P.lapFinalize, img.bg.repStd[s].finalize, 1, 1);
+            }
             run(pass, P.band, img.bg.band[s], ...img.sizes[s]);
             runGroups(pass, P.stats, img.bg.bandStats[s].stats, ...img.bg.bandStats[s].groups);
             runGroups(pass, P.finalize, img.bg.bandStats[s].finalize, 1, 1);
@@ -598,7 +695,7 @@ async function main() {
         rp.setBindGroup(0, display);
         rp.draw(3);
         rp.end();
-        if (currentView().levels) renderThumbs(encoder, c);
+        if (hasThumbs(currentView())) renderThumbs(encoder, c);
 
         const doReadback = !readbackBusy;
         if (doReadback) {   // fit and Laplacian std for the info line and the legends (arrives a frame later)
@@ -616,8 +713,6 @@ async function main() {
                 const stats = Array.from({ length: nLap }, (_, i) => [v[12 + 2 * i], v[13 + 2 * i]]);
                 state.gpuInfo = { mods: Array.from(v.slice(0, 8)), m: v[8], b: v[9], cutoff: c,
                                   lapStds: stats.map((x) => x[0]), weights: stats.map((x) => x[1]) };
-                $('info').textContent = `analysis of the ${state.analyseFoveated ? 'foveated' : 'original'} image · cutoff L${c} · ` +
-                    `${state.fitWeighted ? 'weighted' : 'paper'} fit: std = ${v[8].toFixed(4)} · level + ${v[9].toFixed(4)}`;
                 updateLegend();
                 drawFitPlot();
                 if (first) requestRender();   // display scales depend on these values
@@ -627,15 +722,18 @@ async function main() {
         if (animate) requestRender();
     }
 
-    // Thumbnails under the Enhancement view: the contribution of every synthesized level (display mode 18),
-    // on the same grey scale as the sum. Click: show that level large; click again: back to the sum.
+    // Thumbnails L0..L3 under the image.
+    //   Enhancement: the contribution of every synthesized level (display mode 18), on the same grey scale as the sum.
+    //                Click: show that level large; click again: back to the sum.
+    //   Pyramid image / Laplacian band: that level, as in the large view. Click: show that level large.
     const thumbs = [0, 1, 2, 3].map((s) => {
         const box = document.createElement('button');
         box.type = 'button';
         box.className = 'pam-thumb';
         box.innerHTML = `<canvas></canvas><span>L${s}</span>`;
         box.addEventListener('click', () => {
-            state.enhLevel = state.enhLevel === s ? -1 : s;
+            if (currentView().levels) state.enhLevel = state.enhLevel === s ? -1 : s;
+            else state.level = s;
             updateControls();
             requestRender();
         });
@@ -647,21 +745,27 @@ async function main() {
     });
     function renderThumbs(encoder, c) {
         const r = consts.ratios, dpr = window.devicePixelRatio || 1;
+        const v = currentView(), enh = !!v.levels;
         for (const t of thumbs) {
+            const shown = enh || t.s < levelCount(v.level);
+            t.box.hidden = !shown;
+            if (!shown) continue;
+            const mode = enh ? 18 : v.mode;
+            const aux = enh ? img.bands[Math.min(t.s, img.bands.length - 1)] : auxTexture(t.s);
             const cssW = t.cv.clientWidth || 200;
             const cw = Math.max(1, Math.round(cssW * dpr)), ch = Math.max(1, Math.round(cssW * img.h / img.w * dpr));
             if (t.cv.width !== cw || t.cv.height !== ch) { t.cv.width = cw; t.cv.height = ch; }
             t.cv.style.height = `${cssW * img.h / img.w}px`;
             device.queue.writeBuffer(t.params, 0, new Float32Array([
-                img.w, img.h, SCREEN_WIDTH_PX / SCREEN_WIDTH_CM, consts.sigma0,
-                state.gaze[0], state.gaze[1], state.uniformLevel, img.maxLayer,
-                0, 0, state.distance, 18,
+                img.w, img.h, pxPerCm(), consts.sigma0,
+                state.gaze[0], state.gaze[1], uniformLevel(), img.maxLayer,
+                0, 0, state.distance, mode,
                 r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7],
-                cw, ch, 0, 0,
-                t.s, 4, 0, c,
+                cw, ch, 0, currentView().amp ? state.gain : 1,
+                t.s, displayScale(mode, t.s), 0, c,
             ]));
             const group = bindGroup(displayLayout, [[0, t.params], [1, img.ycc], [2, img.fov], [3, img.maps], [4, img.fovPyr],
-                [5, img.bands[Math.min(t.s, img.bands.length - 1)]], [6, img.final], [7, bandStdsBuffer], [8, fitBuffer]]);
+                [5, aux], [6, img.final], [7, bandStdsBuffer], [8, fitBuffer]]);
             const pass = encoder.beginRenderPass({
                 colorAttachments: [{ view: t.ctx.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] }],
             });
@@ -669,8 +773,9 @@ async function main() {
             pass.setBindGroup(0, group);
             pass.draw(3);
             pass.end();
-            t.label.textContent = t.s < c ? `L${t.s}` : `L${t.s} · not synthesized`;
-            t.box.classList.toggle('on', state.enhLevel === t.s);
+            t.label.textContent = !enh || t.s < c ? `L${t.s}` : `L${t.s} · Not Synthesized`;
+            t.box.classList.toggle('on', enh ? state.enhLevel === t.s : state.level === t.s);
+            t.box.classList.toggle('off', enh && maskActive() && !state.levelOn[t.s]);   // left out of the sum
         }
     }
 
@@ -680,20 +785,21 @@ async function main() {
         const g = state.gpuInfo, el = $('fitPlot');
         if (!g || !el) return;
         const n = g.lapStds.length, c = g.cutoff;
-        const W = 560, H = 210, L = 46, R = 16, T = 14, B = 34;
+        // drawn at the element's own width (fills the row, text stays the same size); 560 while hidden
+        const W = Math.max(320, Math.round(el.clientWidth) || 560), H = 210, L = 46, R = 16, T = 14, B = 34;
         const yMax = Math.max(...g.lapStds, g.m * (n - 0.5) + g.b, 1e-6) * 1.15;
         const X = (lv) => L + (lv + 0.5) / n * (W - L - R);
         const Y = (v) => T + (1 - v / yMax) * (H - T - B);
         const parts = [];
         // levels that get noise
         if (c > 0) parts.push(`<rect x="${X(-0.5)}" y="${T}" width="${X(c - 0.5) - X(-0.5)}" height="${H - T - B}" fill="currentColor" opacity="0.06"/>`,
-            `<text x="${(X(-0.5) + X(c - 0.5)) / 2}" y="${T + 12}" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">synthesized levels</text>`);
+            `<text x="${(X(-0.5) + X(c - 0.5)) / 2}" y="${T + 12}" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">Synthesized Levels</text>`);
         // axes
         parts.push(`<path d="M${L} ${T} V${H - B} H${W - R}" fill="none" stroke="currentColor" stroke-width="1" opacity="0.6"/>`);
         for (let i = 0; i < n; i++) parts.push(`<text x="${X(i)}" y="${H - B + 16}" text-anchor="middle" font-size="11" fill="currentColor">L${i}</text>`);
         parts.push(`<text x="${L - 6}" y="${Y(0) + 4}" text-anchor="end" font-size="11" fill="currentColor">0</text>`,
             `<text x="${L - 6}" y="${Y(yMax / 1.15) + 4}" text-anchor="end" font-size="11" fill="currentColor">${(yMax / 1.15).toFixed(3)}</text>`,
-            `<text x="${(L + W - R) / 2}" y="${H - 4}" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">pyramid level · std of the Laplacian band</text>`);
+            `<text x="${(L + W - R) / 2}" y="${H - 4}" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">Pyramid Level · Std of the Laplacian Band</text>`);
         // fitted line
         // starts where it crosses 0 if it is negative at the left edge (clamping only the start point would change its slope)
         const x1 = n - 0.5, x0 = g.m * -0.5 + g.b < 0 && g.m > 0 ? -g.b / g.m : -0.5;
@@ -721,13 +827,59 @@ async function main() {
     function resizeCanvas() {
         if (!img) return;
         const dpr = window.devicePixelRatio || 1;
-        const cssWidth = canvas.parentElement.clientWidth;
+        const box = canvas.parentElement;
+        const cssWidth = document.fullscreenElement === box
+            ? Math.min(window.innerWidth, window.innerHeight * img.w / img.h)   // full screen: fit the screen
+            : box.clientWidth;
+        state.cssWidth = cssWidth;
+        updateSetupInfo();
         canvas.style.width = `${cssWidth}px`;
         canvas.style.height = `${cssWidth * img.h / img.w}px`;
         canvas.width = Math.round(cssWidth * dpr);
         canvas.height = Math.round(cssWidth * img.h / img.w * dpr);
         requestRender();
     }
+
+    // ---------------------------------------------------------------- screen setup and full screen
+    // the slider shows the current width (it changes with the window, zoom and full screen)
+    function updateSetupInfo() {
+        if (!img || !state.cssWidth) return;
+        const cm = imageWidthCm();
+        $('imageCm').value = cm.toFixed(1);
+        $('imageCmVal').textContent = `${cm.toFixed(1)} cm`;
+        if (typeof updateFills === 'function') updateFills();
+    }
+    try {   // remember the calibration (this browser only)
+        const saved = +localStorage.getItem('pam-cm-per-device-px');
+        if (saved > 0) state.cmPerDevicePx = saved;
+    } catch (e) { /* storage unavailable: default */ }
+    $('imageCm').addEventListener('input', () => {
+        const cm = +$('imageCm').value;
+        if (!(cm > 0) || !state.cssWidth) return;
+        state.cmPerDevicePx = cm / shownDevicePx();
+        $('imageCmVal').textContent = `${cm.toFixed(1)} cm`;
+        try { localStorage.setItem('pam-cm-per-device-px', String(state.cmPerDevicePx)); } catch (e) { /* ignore */ }
+        requestRender();
+    });
+    // full-screen button in the corner of the image, as on a video
+    const FS_ICON = {
+        // 16:9 frame corners, pointing out (enter) or in (exit)
+        enter: '<svg viewBox="0 0 32 18" width="27.2" height="15.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6V1h6M25 1h6v5M31 12v5h-6M7 17H1v-5"/></svg>',
+        exit: '<svg viewBox="0 0 32 18" width="27.2" height="15.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 1v5H1M31 6h-6V1M25 17v-5h6M1 12h6v5"/></svg>',
+    };
+    const fsButton = $('fullscreen');
+    fsButton.innerHTML = FS_ICON.enter;
+    fsButton.addEventListener('click', () => {
+        const box = canvas.parentElement;
+        if (document.fullscreenElement) document.exitFullscreen();
+        else if (box.requestFullscreen) box.requestFullscreen().catch((e) => status(`Full screen not available: ${e.message}`));
+    });
+    document.addEventListener('fullscreenchange', () => {
+        const on = document.fullscreenElement === canvas.parentElement;
+        fsButton.innerHTML = on ? FS_ICON.exit : FS_ICON.enter;
+        fsButton.setAttribute('aria-label', on ? 'Leave full screen' : 'Full screen');
+        resizeCanvas();
+    });
 
     // ---------------------------------------------------------------- UI
     FLOW.forEach((stage, si) => {
@@ -740,11 +892,41 @@ async function main() {
             chip.textContent = v.name;
             chip.dataset.stage = si;
             chip.dataset.view = vi;
-            chip.addEventListener('click', () => { state.stage = si; state.view = vi; updateControls(); requestRender(); });
+            chip.addEventListener('click', () => {
+                // entering the Image Pyramids or Statistics stage: show what a renderer has, the foveated image
+                if (si !== state.stage && stage.toFoveated && !state.analyseFoveated) { state.analyseFoveated = true; state.gpuInfo = null; }
+                state.stage = si; state.view = vi; updateControls(); requestRender();
+            });
             node.querySelector('.chips').appendChild(chip);
         });
         $('flow').appendChild(node);
     });
+    // Flowchart layout from the text, not from the window size: 6 x 1, else 3 x 2, else 2 x 3, else 1 x 6 -- the first in which
+    // every chip label fits on one line with FLOW_MARGIN px to spare. Re-checked on resize and once the fonts are loaded.
+    const FLOW_MARGIN = 6;
+    // (measured on the text itself: buttons do not reliably report their overflow in scrollWidth)
+    const range = document.createRange();
+    function chipFits(c) {
+        range.selectNodeContents(c);
+        const st = getComputedStyle(c);
+        const needed = range.getBoundingClientRect().width + parseFloat(st.paddingLeft) + parseFloat(st.paddingRight);
+        return needed + FLOW_MARGIN <= c.getBoundingClientRect().width;
+    }
+    function layoutFlow() {
+        const flow = $('flow'), chips = [...flow.querySelectorAll('.chip')];
+        for (const cols of [6, 3, 2, 1]) {
+            flow.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+            flow.dataset.cols = cols;
+            if (chips.every(chipFits)) break;
+        }
+    }
+    let flowWidth = -1;   // react to width changes only (the reflow itself changes the container's height)
+    new ResizeObserver((entries) => {
+        const w = Math.round(entries[0].contentRect.width);
+        if (w !== flowWidth) { flowWidth = w; layoutFlow(); }
+    }).observe($('flow').parentElement);
+    if (document.fonts) document.fonts.ready.then(layoutFlow);
+    layoutFlow();
 
     const gazeFromEvent = (e) => {
         const rect = canvas.getBoundingClientRect();
@@ -765,10 +947,38 @@ async function main() {
         requestRender();
     });
 
-    $('level').addEventListener('input', (e) => { state.level = +e.target.value; updateControls(); requestRender(); });
+    // Noise from the measured instead of the extrapolated statistics: no visible control; Shift + M toggles it,
+    // ?noise=measured in the URL starts with it (the #noiseFromRow buttons stay in the page, hidden)
+    if (new URLSearchParams(location.search).get('noise') === 'measured') state.noiseFrom = 'meas';
+    document.addEventListener('keydown', (e) => {
+        if (!e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.key.toLowerCase() !== 'm') return;
+        if (e.target.closest && e.target.closest('input, select, textarea')) return;
+        state.noiseFrom = state.noiseFrom === 'meas' ? 'rep' : 'meas';
+        status(`Noise from the ${state.noiseFrom === 'meas' ? 'measured' : 'extrapolated'} statistics`);
+        updateControls();
+        requestRender();
+    });
+    document.querySelectorAll('#noiseFromBox button').forEach((b) => b.addEventListener('click', () => {
+        state.noiseFrom = b.dataset.from; updateControls(); requestRender();
+    }));
+    document.querySelectorAll('#enhBox button').forEach((b) => b.addEventListener('click', () => {
+        state.enhOn = b.dataset.enh === '1'; updateControls(); requestRender();
+    }));
+    document.querySelectorAll('#fovBox button').forEach((b) => b.addEventListener('click', () => {
+        state.fovMethod = b.dataset.fov; updateControls(); requestRender();
+    }));
     document.querySelectorAll('#variantBox button').forEach((b) => b.addEventListener('click', () => {
         state.variant = b.dataset.variant; updateControls(); requestRender();
     }));
+    // fit plot: hidden until opened with the chart button next to the Intensity Fit toggle
+    $('fitPlotBtn').addEventListener('click', () => {
+        const open = $('fitPlot').hidden;
+        $('fitPlot').hidden = !open;
+        $('fitPlotBtn').classList.toggle('on', open);
+        $('fitPlotBtn').setAttribute('aria-expanded', String(open));
+        $('fitPlotBtn').title = open ? 'Hide the intensity fit plot' : 'Show the intensity fit plot';
+        if (open) drawFitPlot();
+    });
     document.querySelectorAll('#fitBox button').forEach((b) => b.addEventListener('click', () => {
         state.fitWeighted = b.dataset.fit === 'weighted';
         document.querySelectorAll('#fitBox button').forEach((x) => x.classList.toggle('on', x === b));
@@ -782,19 +992,97 @@ async function main() {
         $('distanceVal').textContent = `${state.distance} cm`;
         requestRender();
     });
-    $('uniform').addEventListener('change', (e) => { state.uniformLevel = +e.target.value; requestRender(); });
     $('gain').addEventListener('input', (e) => {
         state.gain = +e.target.value;
         $('gainVal').textContent = state.gain.toFixed(2);
         requestRender();
     });
-    $('autoGaze').addEventListener('change', (e) => { state.autoGaze = e.target.checked; requestRender(); });
-    $('motion').addEventListener('change', (e) => { state.motion = e.target.checked; requestRender(); });
-    $('showGaze').addEventListener('change', (e) => { state.showGaze = e.target.checked; requestRender(); });
-    $('image').addEventListener('change', (e) => loadImage(e.target.value).catch((err) => status(err.message, true)));
+    ['keepI', 'keepD', 'keepP'].forEach((id, k) => $(id).addEventListener('input', (e) => {
+        state.keep[k] = +e.target.value;
+        $(`${id}Val`).textContent = state.keep[k].toFixed(2);
+        requestRender();
+    }));
+    // Fill sliders: a range input drawn as a button that fills from the left (CSS --p = position in %), with its
+    // label on top; a second, light copy of the label is clipped to the filled part so it stays readable there.
+    const fills = [...document.querySelectorAll('.pam-fill')].map((box) => {
+        const input = box.querySelector('input[type=range]'), dark = box.querySelector('.pam-fill-text');
+        const light = document.createElement('span');
+        light.className = 'pam-fill-text pam-fill-light';
+        light.setAttribute('aria-hidden', 'true');
+        box.appendChild(light);
+        const update = () => {
+            const p = (input.value - input.min) / (input.max - input.min) * 100;
+            box.style.setProperty('--p', `${p}%`);
+            light.textContent = dark.textContent;
+        };
+        input.addEventListener('input', update);   // registered after the value labels are updated
+        return update;
+    });
+    var updateFills = () => fills.forEach((f) => f());   // var: also callable from updateSetupInfo
+    // icon buttons next to the full-screen button: pause / resume the automatic eye movement, hide / show the gaze marker
+    // Every icon's viewBox is cropped to its drawn shape (stroke included) and drawn at the same scale (0.85 px per
+    // unit, as the full-screen icon), so equal button padding gives equal visible gaps between the icons. The two
+    // states of a button share one box, so toggling does not move the others.
+    const ICON = (box, path) => {
+        const [, , w, h] = box;
+        return `<svg viewBox="${box.join(' ')}" width="${w * 0.85}" height="${h * 0.85}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+    };
+    const PLAY_BOX = [6, 3.5, 12, 17], EYE_BOX = [1, 4, 22, 16], IMAGE_BOX = [1, 3, 22, 18];
+    const SCENE_ICON = ICON(IMAGE_BOX, '<rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="9.5" r="1.8"/><path d="M3 18l6-6 4 4 3-3 5 5"/>');
+    const GAZE_ICON = {
+        pause: ICON(PLAY_BOX, '<path d="M7 5v14M17 5v14"/>'),
+        play: ICON(PLAY_BOX, '<path d="M7 4.5v15L17 12z"/>'),
+        eye: ICON(EYE_BOX, '<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+        eyeOff: ICON(EYE_BOX, '<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M5 5l14 14"/>'),
+    };
+    function updateGazeButtons() {
+        const a = $('autoGazeBtn'), g = $('showGazeBtn');
+        a.innerHTML = state.autoGaze ? GAZE_ICON.pause : GAZE_ICON.play;
+        a.title = state.autoGaze ? 'Pause the automatic eye movement (it runs while the mouse is not over the image)'
+                                 : 'Resume the automatic eye movement (it runs while the mouse is not over the image)';
+        g.innerHTML = state.showGaze ? GAZE_ICON.eye : GAZE_ICON.eyeOff;
+        g.title = state.showGaze ? 'Hide the gaze marker' : 'Show the gaze marker';
+        a.setAttribute('aria-label', a.title);
+        g.setAttribute('aria-label', g.title);
+    }
+    $('autoGazeBtn').addEventListener('click', () => { state.autoGaze = !state.autoGaze; updateGazeButtons(); requestRender(); });
+    $('showGazeBtn').addEventListener('click', () => { state.showGaze = !state.showGaze; updateGazeButtons(); requestRender(); });
+    updateGazeButtons();
+    // scene button: cycles through the scenes listed in the (hidden) #image select of the page
+    const sceneSelect = $('image'), sceneBtn = $('sceneBtn');
+    let sceneLoading = false;
+    sceneBtn.innerHTML = SCENE_ICON;
+    // info icon: opens a short explanation above the icons; closes on a second click, a click elsewhere or Esc
+    const infoBtn = $('infoBtn'), infoPop = $('infoPop');
+    infoBtn.innerHTML = ICON([2, 2, 20, 20], '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.01"/>');
+    const setInfo = (open) => {
+        infoPop.hidden = !open;
+        infoBtn.setAttribute('aria-expanded', String(open));
+        infoBtn.title = open ? 'Close the explanation' : 'How to use the demo';
+        infoBtn.setAttribute('aria-label', infoBtn.title);
+    };
+    setInfo(false);
+    infoBtn.addEventListener('click', (e) => { e.stopPropagation(); setInfo(infoPop.hidden); });
+    document.addEventListener('click', (e) => { if (!infoPop.hidden && !infoPop.contains(e.target)) setInfo(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !infoPop.hidden) setInfo(false); });
+    function updateSceneButton() {
+        const opts = sceneSelect.options, i = sceneSelect.selectedIndex;
+        sceneBtn.title = `Scene: ${opts[i].text} (${i + 1} / ${opts.length}). Click for the next one: ${opts[(i + 1) % opts.length].text}`;
+        sceneBtn.setAttribute('aria-label', sceneBtn.title);
+    }
+    sceneBtn.addEventListener('click', async () => {
+        if (sceneLoading) return;   // one scene at a time
+        sceneLoading = true;
+        sceneSelect.selectedIndex = (sceneSelect.selectedIndex + 1) % sceneSelect.options.length;
+        updateSceneButton();
+        try { await loadImage(sceneSelect.value); } catch (err) { status(err.message, true); }
+        sceneLoading = false;
+    });
+    updateSceneButton();
     window.addEventListener('resize', resizeCanvas);
 
     updateControls();
+    updateFills();
     await loadImage($('image').value);
 }
 
