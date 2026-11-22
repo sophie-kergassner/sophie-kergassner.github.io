@@ -543,8 +543,9 @@ async function main() {
         const k = displayScale(mode, l);
         if (mode === 3) return [-1 / k, 1 / k];         // diverging map over [-1, 1]
         if (!lg.positive) return [-0.5 / k, 0.5 / k];
-        const mod = state.gpuInfo ? state.gpuInfo.mods[l] || 0 : 0;
-        return [0, mode === 10 ? mod / k : 1 / k];   // measured view shows |G + iH|; label it as intensity
+        // measured view (10) shows |G + iH| scaled by modulator / top; labelled as intensity it shares the repaired
+        // view's scale [0, top]. (mod / k gives the same, but is 0 / 0 when the fit clamps the level's modulator to 0.)
+        return [0, mode === 10 ? 1 / displayScale(12, l) : 1 / k];
     }
     // The min label has a fixed width per view (the widest it gets over the view's levels and variants, and the widest
     // seen so far), so the bar does not move while clicking through levels, only when switching to another view.

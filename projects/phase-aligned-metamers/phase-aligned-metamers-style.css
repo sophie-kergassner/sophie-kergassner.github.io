@@ -144,7 +144,8 @@
     overflow: hidden;
     background: var(--gray-light);
 }
-.pam-demo canvas { display: block; cursor: crosshair; touch-action: none; }
+.pam-demo canvas { display: block; cursor: crosshair; touch-action: none;
+    width: 100%; aspect-ratio: 2 / 1; }   /* reserve the image's 2:1 box before main.js sizes it (no layout jump on load) */
 
 .pam-demo .pam-context { padding: 16px 0; gap: 12px 24px; align-items: center; border-bottom: 1px solid var(--gray-medium); }   /* line under the view's sliders */
 .pam-demo .pam-context:not(:has(> :not([hidden]))) { display: none; }   /* no view controls: no empty row */
