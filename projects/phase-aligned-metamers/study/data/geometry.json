@@ -1,0 +1,203 @@
+{
+  "description": "Viewing geometry of the calibration study (Kergassner & Didyk 2026, Sec. 6). Lengths in cm unless noted. Screen pixel coordinates: origin at the top-left corner of the main display, x to the right, y down, for sessions with the observer at the left side (right-side sessions are mirrored); values outside 0..3840 lie in the plane of the display, beyond its edge. Values marked \"derived\" are computed from the listed sources.",
+  "display": {
+    "model": "LG OLED, 55 inch",
+    "resolution_px": [
+      3840,
+      2160
+    ],
+    "diagonal_in": 55,
+    "width_cm": 121.76,
+    "height_cm": 68.49,
+    "pixel_pitch_mm": 0.3171,
+    "note": "Width, height and pitch derived from the nominal 55 inch 16:9 diagonal. The paper's '3480 x 2160' is a typo for 3840 x 2160."
+  },
+  "observer": {
+    "viewing_distance_cm": 143.0,
+    "head_stabilisation": "chin rest",
+    "eye_tracker": "Tobii Pro Spectrum",
+    "eye_position_px": [
+      13.5,
+      1080.0
+    ],
+    "eye_model": "Peripheral conditions: the eye is 143 cm in front of the rim of the main display (eye_position_px), perpendicular to the screen. For 8 deg the observer fixates that rim point; for 16 and 24 deg the observer turns (rotation about the eye) towards the helper display, so gaze makes gaze_rotation_deg with the screen normal. Eccentricity = angle between the line of sight and the direction to a point.",
+    "pixels_per_degree_straight_ahead": 78.72,
+    "nyquist_cpd_straight_ahead": 39.36,
+    "note": "pixels_per_degree derived for a screen point straight ahead of the eye. cutoff_cpd in the data uses 40 cpd for the full-resolution image; on the slanted, flat screen the actual cycles per degree of a given image frequency vary with position."
+  },
+  "conditions": {
+    "0": {
+      "viewing": "free viewing, observer centred in front of the main display, no fixation point, no mask",
+      "eye_in_front_of_px": [
+        1920.0,
+        1080.0
+      ]
+    },
+    "8": {
+      "fixation_px": [
+        13.5,
+        1080.0
+      ],
+      "gaze_rotation_deg": 0.0,
+      "tv_near_corners_ecc_deg": 13.47,
+      "tv_far_edge_ecc_deg": 40.31,
+      "tv_far_corners_ecc_deg": 41.4,
+      "viewing": "fixation point on the rim of the main display; observer in front of that rim, looking straight at the screen"
+    },
+    "16": {
+      "fixation_px": [
+        -786.5,
+        1080.0
+      ],
+      "gaze_rotation_deg": 10.06,
+      "tv_near_corners_ecc_deg": 16.65,
+      "tv_far_edge_ecc_deg": 50.37,
+      "tv_far_corners_ecc_deg": 51.14,
+      "viewing": "observer seated as for 8 deg (in front of the rim, perpendicular to the screen), then turned towards a fixation point on a separate helper display further to the side; the main display is seen at a slant. fixation_px is the direction of that fixation point, expressed in the plane of the main display.",
+      "fixation_cm_beyond_tv_edge": 24.94
+    },
+    "24": {
+      "fixation_px": [
+        -1556.5,
+        1080.0
+      ],
+      "gaze_rotation_deg": 19.19,
+      "tv_near_corners_ecc_deg": 23.16,
+      "tv_far_edge_ecc_deg": 59.51,
+      "tv_far_corners_ecc_deg": 60.06,
+      "viewing": "observer seated as for 8 deg (in front of the rim, perpendicular to the screen), then turned towards a fixation point on a separate helper display further to the side; the main display is seen at a slant. fixation_px is the direction of that fixation point, expressed in the plane of the main display.",
+      "fixation_cm_beyond_tv_edge": 49.35
+    }
+  },
+  "stimulus_layout": {
+    "image_size_px": [
+      4096,
+      2048
+    ],
+    "display_scale": "1 image pixel = 1 screen pixel (orthographic camera, size 2.16 units = 1080 px, image planes 500 px per unit)",
+    "visible_image_columns": [
+      128,
+      3968
+    ],
+    "split": "horizontal: the screen shows two halves (top and bottom), each 3840 x 1024 px, touching at the screen's horizontal midline. One half shows the reference, the other the test image, side chosen at random per trial.",
+    "half_content": "Both halves show the same horizontal band of 1024 image rows, v in [0.5 - o, 1 - o] (texture coordinates, v = 0 at the bottom of the image), where o is the per-scene band offset below. The two halves are mirror images about the screen's horizontal midline, so corresponding pixels sit at equal eccentricity.",
+    "separator_bar": {
+      "description": "A horizontal grey bar (same grey as the background, RGB 127) lay over the boundary between the two halves, across the whole width, in front of the images. It hides the image rows next to the midline in both halves.",
+      "centre_px_y": 1080,
+      "half_width_px": {
+        "opaque_until": 40.0,
+        "half_alpha": 54.8,
+        "fully_transparent_from": 68.6
+      },
+      "length_px": 4116,
+      "source": "Unity: object 'Bar (1)', sprite 'Bar-grey 1.png' (2000 px, 100 px per unit, a vertical bar with soft edges), rotated by 90 degrees, scale 0.1973 x 0.4116, in front of the image planes; widths from the sprite's alpha profile"
+    },
+    "scene_band_offset_o": {
+      "Tree": 0.32,
+      "Flat": 0.15,
+      "Face": 0.23,
+      "Fish": 0.42,
+      "Classroom": 0.21,
+      "House": 0.42
+    },
+    "vertical_extent_px": [
+      56,
+      2104
+    ],
+    "left_right_sessions": "For sessions with the observer at the left side the images are mirrored horizontally, so the layout relative to the fixation point is identical on both sides.",
+    "source": "Unity project RichImageStatistics, StudyManager.cs and Scenes/CalibrationStudy.unity"
+  },
+  "foveal_mask": {
+    "description": "A soft-edged grey disc in the plane of the main display, centred on the fixation direction; on the main display only the part of the disc that overlaps the screen is visible. Fully opaque out to opaque_until, fading to fully transparent at fully_transparent_from. mask_ecc_deg in the data is the nominal radius (0 = free viewing, no mask).",
+    "conditions": {
+      "8": {
+        "centre_px": [
+          13.5,
+          1080.0
+        ],
+        "radius_px": {
+          "opaque_until": 611.81,
+          "half_alpha": 668.36,
+          "fully_transparent_from": 742.05
+        },
+        "edge_eccentricity_deg": {
+          "opaque_until": [
+            7.73,
+            7.73
+          ],
+          "half_alpha": [
+            8.43,
+            8.43
+          ],
+          "fully_transparent_from": [
+            9.34,
+            9.34
+          ]
+        }
+      },
+      "16": {
+        "centre_px": [
+          -786.5,
+          1080.0
+        ],
+        "radius_px": {
+          "opaque_until": 1273.42,
+          "half_alpha": 1391.13,
+          "fully_transparent_from": 1544.51
+        },
+        "edge_eccentricity_deg": {
+          "opaque_until": [
+            15.9,
+            16.05
+          ],
+          "half_alpha": [
+            17.34,
+            17.53
+          ],
+          "fully_transparent_from": [
+            19.25,
+            19.43
+          ]
+        }
+      },
+      "24": {
+        "centre_px": [
+          -1556.5,
+          1080.0
+        ],
+        "radius_px": {
+          "opaque_until": 1932.35,
+          "half_alpha": 2110.97,
+          "fully_transparent_from": 2343.72
+        },
+        "edge_eccentricity_deg": {
+          "opaque_until": [
+            23.63,
+            23.79
+          ],
+          "half_alpha": [
+            25.85,
+            26.03
+          ],
+          "fully_transparent_from": [
+            28.72,
+            28.93
+          ]
+        }
+      }
+    },
+    "note": "centre_px and radius_px are exact (Unity: mask centre x = -3.813, -5.413, -6.953 units, sprite \"Fovea-Blacking-grey 1.png\" 2000 px at 100 px per unit, scale 0.2285, 0.4756, 0.7217; radii from the sprite's alpha profile). edge_eccentricity_deg: range of eccentricity along each edge where it lies on the screen, derived with the eye model."
+  },
+  "timing": {
+    "presentation_s": 1.5,
+    "countdown_s_per_marker": 0.3,
+    "note": "Peripheral conditions: 1.5 s (paper: limited at higher eccentricities to prevent afterimages), preceded by a countdown whose markers disappear every 0.3 s, followed by a blank plane until the response. Gaze was monitored by the eye tracker; when gaze left the fixation point the stimulus was hidden, and a trial was shown again if the stimulus had been visible for less than 80 % of the presentation time."
+  },
+  "task": {
+    "type": "2AFC",
+    "question": "Which half (top or bottom) is the unmodified full-resolution image?",
+    "chance": 0.5,
+    "reference_image": "<scene>_reference.png",
+    "reference_note": "The reference is the full-resolution rendering with contrast enhancement (Patney et al. 2016: box filter, sigma 2, f_e 0.2, i.e. local contrast x 1.4) applied to luma, not the plain rendering."
+  }
+}

@@ -4,30 +4,16 @@
 //   G     = cos^2 Ga - 2 cos sin Gb + sin^2 Gc                   phu.get_Gk
 //   H     = cos^3 Ha - 3 cos^2 sin Hb + 3 cos sin^2 Hc - sin^3 Hd  phu.get_Hk
 //   phase = angle(G + iH),  magnitude = |G + iH|                 Worm.compute_steered_G_H / compute_phase
+// main_presmoothed (orientation stability fix, web only): C2, C3 already averaged by orient_smooth.wgsl, no box.
+// main_dilated (Fix 4, dense coarse evaluation): the 5x5 box with its taps 2 px apart (the box of level l+1 at level l).
 
 @group(0) @binding(0) var ra: texture_2d<f32>;                           // Ga, Gb, Gc, Ha
 @group(0) @binding(1) var rb: texture_2d<f32>;                           // Hb, Hc, Hd, 0
 @group(0) @binding(2) var cc: texture_2d<f32>;                           // C2, C3
 @group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;   // dir, phase, |G + iH|, S
 
-@compute @workgroup_size(8, 8)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    let dims = textureDimensions(dst);
-    if (id.x >= dims.x || id.y >= dims.y) { return; }
-    let n = vec2<i32>(dims);
-    let p = vec2<i32>(id.xy);
-
-    var C = vec2<f32>(0.0);
-    for (var dy = -2; dy <= 2; dy++) {
-        for (var dx = -2; dx <= 2; dx++) {
-            let q = p + vec2<i32>(dx, dy);
-            if (q.x >= 0 && q.y >= 0 && q.x < n.x && q.y < n.y) {   // zero padding
-                C += textureLoad(cc, q, 0).rg;
-            }
-        }
-    }
-    C = C / 25.0;
-
+// steered responses, phase and magnitude at p for the (blurred) orientation energy C = (C2, C3)
+fn steer(p: vec2<i32>, C: vec2<f32>) {
     let theta = atan2(C.y, C.x) / 2.0;
     let S = sqrt(C.x * C.x + C.y * C.y);
     let c = cos(theta);
@@ -38,4 +24,41 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let H = c * c * c * a.w + (-3.0 * c * c * s) * b.x + (3.0 * c * s * s) * b.y + (-s * s * s) * b.z;
 
     textureStore(dst, p, vec4<f32>(theta, atan2(H, G), sqrt(G * G + H * H), S));
+}
+
+fn box_avg(p: vec2<i32>, n: vec2<i32>, dil: i32) -> vec2<f32> {
+    var C = vec2<f32>(0.0);
+    for (var dy = -2; dy <= 2; dy++) {
+        for (var dx = -2; dx <= 2; dx++) {
+            let q = p + dil * vec2<i32>(dx, dy);
+            if (q.x >= 0 && q.y >= 0 && q.x < n.x && q.y < n.y) {   // zero padding
+                C += textureLoad(cc, q, 0).rg;
+            }
+        }
+    }
+    return C / 25.0;
+}
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+    let dims = textureDimensions(dst);
+    if (id.x >= dims.x || id.y >= dims.y) { return; }
+    let p = vec2<i32>(id.xy);
+    steer(p, box_avg(p, vec2<i32>(dims), 1));
+}
+
+@compute @workgroup_size(8, 8)
+fn main_dilated(@builtin(global_invocation_id) id: vec3<u32>) {
+    let dims = textureDimensions(dst);
+    if (id.x >= dims.x || id.y >= dims.y) { return; }
+    let p = vec2<i32>(id.xy);
+    steer(p, box_avg(p, vec2<i32>(dims), 2));
+}
+
+@compute @workgroup_size(8, 8)
+fn main_presmoothed(@builtin(global_invocation_id) id: vec3<u32>) {
+    let dims = textureDimensions(dst);
+    if (id.x >= dims.x || id.y >= dims.y) { return; }
+    let p = vec2<i32>(id.xy);
+    steer(p, textureLoad(cc, p, 0).rg);
 }

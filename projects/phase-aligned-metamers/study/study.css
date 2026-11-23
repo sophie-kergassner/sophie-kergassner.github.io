@@ -1,0 +1,181 @@
+/* Calibration study viewer. Builds on .pam-demo (canvas box, .pam-seg buttons) from phase-aligned-metamers-style.css. */
+
+.pam-study .pam-canvas { position: relative; }
+.pam-study canvas { cursor: grab; aspect-ratio: 2 / 1; }
+.pam-study canvas.ps-grabbing { cursor: grabbing; }
+
+/* the three view buttons, top right: separate buttons (each with the shadow of the demo's overlay buttons) */
+.pam-study .ps-viewbtns { position: absolute; top: 10px; right: 10px; gap: 6px; font-size: 0.8em; line-height: normal; }
+.pam-study .ps-viewbtns button { box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25); }
+.pam-study .ps-hint {
+    position: absolute;
+    left: 12px;
+    bottom: 10px;
+    margin: 0;
+    font-size: 0.65em;
+    line-height: 1.3;
+    color: #6f6a5f;
+    pointer-events: none;
+}
+
+/* the selection buttons with the chart right next to them; the chart moves below when the viewer gets narrow */
+.pam-study .ps-main {
+    display: grid;
+    grid-template-columns: fit-content(calc(55% - 12px)) minmax(0, 1fr);
+    /* buttons as wide as they need (the chart takes the rest) up to 55 : 45; then both shrink */
+    gap: 16px 24px;
+    align-items: start;
+    padding: 20px 0 0;
+}
+.pam-study #psChart { min-width: 0; overflow: hidden; }            /* lets the column shrink; study.js redraws at the new size */
+@container (max-width: 580px) { .pam-study .ps-main { grid-template-columns: minmax(0, 1fr); } }   /* below 2 x ~276 px: chart below, full width */   /* chart below, full width */
+.pam-study .ps-controls {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 10px 16px;
+    align-items: first baseline;                                    /* each label on the text line of its first row of buttons */
+    font-size: 0.8em;
+    color: var(--highlight-color);
+}
+.pam-study .ps-plotlegend { font-size: 9px; }
+.pam-study .ps-controls .pam-seg { flex-wrap: wrap; }
+.pam-study .pam-seg button:disabled { opacity: 0.35; cursor: default; }
+@media (max-width: 500px) {                                         /* narrow: labels above their buttons */
+    .pam-study .ps-controls { grid-template-columns: 1fr; gap: 4px; }
+    .pam-study .ps-controls .ps-label { margin-top: 8px; }
+}
+
+.pam-study .ps-info {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
+    gap: 24px;
+    padding: 16px 0 0;
+    font-size: 0.8em;
+    color: #4f4f55;
+}
+@media (max-width: 680px) {
+    .pam-study .ps-info { grid-template-columns: 1fr; }
+}
+.pam-study .ps-info p { margin: 0 0 6px; font-size: inherit; line-height: 1.5; }   /* same size as the control labels (site p is 1rem) */
+.pam-study .ps-big span { color: #888; }
+
+.pam-study #psChart svg { display: block; font-size: 10px; fill: #6f6a5f; }   /* size set by study.js */
+.pam-study .ps-legend { font-size: 0.85em; color: #888; margin-top: 4px !important; }
+.pam-study .ps-legend > span + span::before { content: " · "; }
+.pam-study .ps-dot, .pam-study .ps-ring {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+.pam-study .ps-ring { background: white; border: 1.5px solid #4f4f55; width: 6px; height: 6px; }
+
+/* full screen: the view fills the whole screen (the field of view stays horizontal; True Size adapts to the width) */
+.pam-study .pam-canvas:fullscreen canvas { width: 100vw; height: 100vh; aspect-ratio: auto; }
+
+/* True Size panel: a popover inside the view (so it also works in full screen), under the buttons top right */
+.pam-study .ps-setup {
+    top: 44px; right: 10px; bottom: auto;
+    width: 250px; max-width: calc(100% - 20px); box-sizing: border-box;
+    display: grid; gap: 8px;
+}
+.pam-study .ps-num { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; }
+.pam-study .ps-num input {
+    width: 64px; height: 22px; padding: 0 6px; box-sizing: border-box;
+    font: inherit; text-align: right; color: #4f4f55;
+    border: 0; border-radius: 4px; background: white;
+}
+.pam-study .ps-setup-note { margin: 0; font-size: 0.9em; color: #888; }
+.pam-study .ps-setup .pam-seg button { width: 100%; }
+.pam-study .ps-setup .pam-seg button:not(.on) { background: white; }   /* the panel itself is light beige */
+
+/* full-screen icon: dark on the light room background (the demo's is light, for an image underneath) */
+.pam-study .pam-fs { color: #6f6a5f; filter: none; }
+
+/* labels: HTML text over the 3D view (placed by study.js), so they stay sharp */
+.pam-study .ps-labels { position: absolute; inset: 0; overflow: hidden; pointer-events: none; line-height: 1; }
+.pam-study .ps-labels span { position: absolute; left: 0; top: 0; white-space: nowrap; color: #bf0c4c; will-change: transform; }
+.pam-study .ps-lbl-ring { font-size: 11px; font-weight: 600; margin: -6px 0 0 4px;
+    text-shadow: 0 0 3px #e9e6dc, 0 0 3px #e9e6dc, 0 0 2px #e9e6dc; }      /* halo in the room colour where a label crosses the image */
+.pam-study .ps-lbl-fix { font-size: 13px; font-weight: 600; translate: -50% 10px; }   /* centred under the dot */
+.pam-study .ps-labels[data-eye="left"] .ps-lbl-fix { translate: 12px -50%; }               /* dot on the left edge: label to its right */
+.pam-study .ps-labels[data-eye="right"] .ps-lbl-fix { translate: calc(-100% - 12px) -50%; } /* dot on the right edge: label to its left */
+
+/* full screen: the selection buttons and the chart side by side, as a panel in the bottom-left corner of the view */
+.pam-study .ps-fs-panel {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+    max-width: calc(100% - 80px);
+    padding: 10px 12px;
+    line-height: normal;
+    border-radius: 6px;
+    background: rgba(241, 239, 227, 0.92);                 /* --gray-light, slightly see-through */
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+}
+.pam-study .ps-fs-panel .ps-controls { padding: 0; gap: 6px 12px; font-size: 0.7em; border: 0; max-width: 640px; }
+.pam-study .ps-fs-panel .pam-seg button:not(.on) { background: white; }
+.pam-study .ps-fs-panel #psChart { display: flex; align-items: center; gap: 10px; flex: none; font-size: 0.7em; }
+.pam-study .ps-fs-panel #psChart svg { flex: none; }                       /* height set by study.js: as high as the buttons */
+.pam-study .ps-fs-panel .ps-legend { width: 120px; margin: 0 !important; }
+.pam-study .ps-fs-panel .ps-legend > span { display: block; margin-bottom: 4px; }
+.pam-study .ps-fs-panel .ps-legend > span + span::before { content: none; }
+.pam-study .ps-fs-panel #psChart rect { fill: white; }   /* plot area light on the beige panel */
+.pam-study .pam-canvas:fullscreen .ps-hint { display: none; }   /* its corner is taken by the panel */
+
+
+/* level row: the level buttons and the Mark Visibility toggle */
+.pam-study .ps-levelrow { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }   /* auto-select on its own line */
+/* Mark Visibility: eye = above the threshold (visible), crossed-out eye = below (not reliably visible) */
+.pam-study .ps-visible::before, .pam-study .ps-invisible::before {
+    content: "";
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    margin-right: 5px;
+    vertical-align: -2px;
+    background: no-repeat center / contain;
+}
+.pam-study .ps-visible::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f4f55' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+}
+.pam-study .ps-invisible::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M3 3l18 18'/%3E%3C/svg%3E");
+}
+.pam-study .pam-seg button.ps-invisible:not(.on) { color: #999; }   /* below threshold: also lighter text */
+.pam-study canvas.ps-2d { cursor: default; aspect-ratio: 3840 / 2048; }   /* 2D view: both halves (3840 x 2048 px), exactly */
+
+/* Auto-select highest invisible level: a light checkbox-style option under the level buttons */
+.pam-study .ps-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 0.9375em;
+    color: #888;
+    cursor: pointer;
+}
+.pam-study .ps-check::before {
+    content: "";
+    width: 11px;
+    height: 11px;
+    box-sizing: border-box;
+    border: 1.5px solid #aaa;
+    border-radius: 3px;
+    background: white no-repeat center / 9px 9px;
+}
+.pam-study .ps-check.on { color: #4f4f55; }
+.pam-study .ps-check.on::before {
+    border-color: var(--gray-darker, #878787);
+    background-color: var(--gray-dark);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%234f4f55' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.5l2.5 2.5 4.5-6'/%3E%3C/svg%3E");
+}
+.pam-study .ps-check:hover { color: #4f4f55; }

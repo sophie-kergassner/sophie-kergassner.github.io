@@ -345,3 +345,9 @@
 .pam-placeholder p { margin: 0 0 6px; font-size: 0.8em; line-height: 1.4; text-align: center; }
 .pam-placeholder .pam-placeholder-title { font-size: 1em; font-weight: 700; color: #4f4f55; margin-bottom: 10px; }
 .pam-placeholder .pam-fallback-reason { margin-top: 14px; color: #4f4f55; }
+
+/* post-project fix toggles, only shown with ?fix in the URL (main.js) */
+.pam-demo .pam-fixes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.pam-demo .pam-fixes:not(:has(button:not([hidden]))) { display: none; }
+.pam-demo .pam-fixes button { font: inherit; font-size: 0.7em; padding: 2px 8px; border: 1px solid #c8c8cc; border-radius: 4px; background: transparent; color: #4f4f55; cursor: pointer; }
+.pam-demo .pam-fixes button.on { background: var(--highlight-color); border-color: var(--highlight-color); color: white; }

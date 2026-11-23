@@ -8,7 +8,17 @@
 //
 // Effect of the parameters (NoiseGenerator.randomize_stats, keep_* < 1): each statistic is blended with a random field,
 //   intensity = keep * intensity + (1 - keep) * u * std(intensity of level s)
-//   direction, phase: blended on the unit circle (direction in the doubled-angle domain)
+//   direction, phase: blended with a random field on the unit circle (direction in the doubled-angle domain)
+//
+// Phase tracking (web only, BP.keep.w): the noise is cos(phase) G(dir) - sin(phase) H(dir), and H is odd:
+// H(dir + pi) = -H(dir). The orientation is stored in (-pi/2, pi/2], so where it turns smoothly through +-90 deg the
+// stored value jumps by pi and H flips sign. The measured phase flips with it (the noise stays the same), a random
+// phase does not: with a moving image or video, the noise jumps wherever that wrap passes. The entry point `track`
+// keeps, per pixel of level s, the orientation over the full circle (two textures, alternating per frame): in the first frame (or after a
+// reset) the current orientation; afterwards whichever of dir and dir + pi is closer to the stored one. Where it is
+// dir + pi (sigma = -1), the pixel's phase is inverted: the blend is computed in that representation,
+//   phase = sigma * cyclic_blend(sigma * phase_measured, phase_random, keep_phase),
+// which equals the measured phase for keep_phase = 1 and keeps a random phase continuous through the wrap.
 // The random fields come from a hash of (pixel of level s, s, statistic) instead of torch.rand, so they stay the
 // same from frame to frame and while a slider moves; web/test_webgpu.py --keep uses the same hash as reference.
 
@@ -17,7 +27,7 @@ struct BandParams {
     full_w: f32,
     level: f32,      // s
     randomize: f32,  // 1: blend with the random fields (some keep < 1)
-    keep: vec4<f32>, // keep_intensity, keep_dir, keep_phase, unused
+    keep: vec4<f32>, // keep_intensity, keep_dir, keep_phase, phase tracking (0 off, 1 on, 2 reset: state = current)
 }
 
 @group(0) @binding(0) var<uniform> BP: BandParams;
@@ -25,6 +35,11 @@ struct BandParams {
 @group(0) @binding(2) var rep: texture_2d<f32>;                          // intensity_rep, dir_rep, phase_rep of level s
 @group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;      // noise band at the size of level s
 @group(0) @binding(4) var<storage, read> rep_std: array<vec2<f32>, 8>;   // (std of intensity_rep, 1) per level
+@group(0) @binding(5) var track_in: texture_2d<f32>;                     // main: tracked orientation of this frame
+@group(0) @binding(6) var track_prev: texture_2d<f32>;                   // track: state of the previous frame
+@group(0) @binding(7) var track_out: texture_storage_2d<r32float, write>;   // track: state of this frame (ping-pong)
+
+const PI: f32 = 3.14159265358979;
 
 // PCG hash (Jarzynski & Olano 2020)
 fn pcg(v: u32) -> u32 {
@@ -42,18 +57,41 @@ fn cyclic_blend(a: f32, b: f32, keep: f32) -> f32 {
     let v = keep * vec2<f32>(cos(a), sin(a)) + (1.0 - keep) * vec2<f32>(cos(b), sin(b));
     return atan2(v.y, v.x);
 }
+// orientation used for the noise at field pixel p (after the blend with the random field, if any)
+fn dir_at(p: vec2<i32>) -> f32 {
+    let d = textureLoad(rep, p, 0).y;
+    if (BP.randomize < 0.5) { return d; }
+    return cyclic_blend(2.0 * d, 2.0 * (rand(p, u32(BP.level), 1u) * PI - PI), BP.keep.y) / 2.0;
+}
+
 // statistics of field pixel p (intensity, direction, phase), blended with the random fields if requested
 fn stats_at(p: vec2<i32>) -> vec3<f32> {
     var f = textureLoad(rep, p, 0).xyz;
     if (BP.randomize > 0.5) {
         let s = u32(BP.level);
         let k = BP.keep;
-        let pi = 3.14159265358979;
         f.x = k.x * f.x + (1.0 - k.x) * rand(p, s, 0u) * rep_std[s].x;
-        f.y = cyclic_blend(2.0 * f.y, 2.0 * (rand(p, s, 1u) * pi - pi), k.y) / 2.0;
-        f.z = cyclic_blend(f.z, rand(p, s, 2u) * 2.0 * pi - pi, k.z);
+        f.y = dir_at(p);
+        // sigma = -1 where the tracked orientation is f.y + pi: phase blended in that representation (see the header)
+        var sigma = 1.0;
+        if (k.w > 0.5) { sigma = select(1.0, -1.0, cos(textureLoad(track_in, p, 0).r - f.y) < 0.0); }
+        f.z = sigma * cyclic_blend(sigma * f.z, rand(p, s, 2u) * 2.0 * PI - PI, k.z);
     }
     return f;
+}
+
+// Phase tracking, per pixel of level s (before main): state = dir or dir + pi, whichever is closer to the stored state
+@compute @workgroup_size(8, 8)
+fn track(@builtin(global_invocation_id) id: vec3<u32>) {
+    let dims = textureDimensions(track_out);
+    if (id.x >= dims.x || id.y >= dims.y) { return; }
+    let p = vec2<i32>(id.xy);
+    let d = dir_at(p);
+    var t = d;
+    if (BP.keep.w < 1.5 && cos(d - textureLoad(track_prev, p, 0).r) < 0.0) {
+        t = select(d - PI, d + PI, d < 0.0);   // the other representation, kept in (-pi, pi]
+    }
+    textureStore(track_out, p, vec4<f32>(t, 0.0, 0.0, 0.0));
 }
 
 // offset of pixel coordinate v from the impulse of grid offset `shift` that reaches it, or 99 if none does

@@ -43,6 +43,9 @@ const FLOW = [
           // "Line / Edge" toggle (#phaseBox): which structure the phase describes (structure() in display.wgsl)
           structure: { measured: 19, repaired: 20 },
           structureLegend: { map: 'structure', labels: ['Line', 'Edge'], unit: '· white: no data' },
+          // "Sureness" (#phaseBox): how stable the Line / Edge judgement is (sem_smooth.wgsl sem_sure)
+          sure: { measured: 21, repaired: 22 },
+          sureLegend: { map: 'sure', labels: ['Sure', 'Unsure'], unit: '· white: no data' },
           note: () => 'Angle: frequency-adjusted per level. Line / Edge: the semantics, only spatially upscaled.' },
     ] },
     { title: 'Noise', views: [
@@ -57,6 +60,12 @@ const $ = (id) => document.getElementById(id);
 // The demo can be embedded in another page: the element with [data-pam-demo] may set data-base, the path
 // (relative to the page) of the folder that contains shaders/ and constants.json.
 const BASE = (document.querySelector('[data-pam-demo]') || { dataset: {} }).dataset.base || '';
+// data-fixes (e.g. "1,2" on the website) lists the post-project fixes that start ON; the others (3, 4) start off.
+// Without the attribute every fix keeps its own default. A URL parameter (?align=0, ?orient=1, ...) overrides both.
+const PAGE_FIXES = (document.querySelector('[data-pam-demo]') || { dataset: {} }).dataset.fixes;
+const URL_PARAMS = new URLSearchParams(location.search);
+const fixOn = (n, param) => URL_PARAMS.has(param) ? URL_PARAMS.get(param) !== '0'
+    : PAGE_FIXES === undefined || PAGE_FIXES.split(',').map((s) => s.trim()).includes(String(n));
 let errorShown = false;
 // The demo could not start (no WebGPU, no adapter, an error while setting up): the page's placeholder (#pamFallback)
 // replaces the demo, with the reason in it. Errors later on (e.g. a lost device) only show in the status line.
@@ -82,7 +91,8 @@ const status = (msg, isError = false) => {
 const state = {
     stage: 5, view: 0,      // selected flowchart node and view
     variant: 'repaired',    // statistics: measured / repaired
-    phaseShow: 'angle',     // Phase view: the angle ('angle', cyclic map) or the structure it describes ('structure': line / edge / none)
+    phaseShow: 'angle',     // Phase view: the angle ('angle', cyclic map), the structure it describes ('structure': line / edge / none),
+                            // or how sure that judgement is ('sure')
     fovMethod: 'blur',      // foveated view: per-pixel blur / from the pyramid / their difference
     level: 0,               // pyramid level of the level views
     gaze: null,             // [row, col] in image pixels
@@ -99,6 +109,17 @@ const state = {
     gain: 1,                // noise gain of the "Final image" view (1 = as computed, 0 = no noise)
     enhOn: true,            // Final Image: enhancement on (foveated + noise) / off (foveated image only)
     levelOn: [true, true, true, true],   // Enhancement / Final Image with "All": which levels' noise is included
+    motion: false,          // moving input: the image is translated every frame (temporal stability test, #motion)
+    align: fixOn(1, 'align'),   // Fix 1: phase orientation-convention fix (writeAlign)
+    orientFix: fixOn(2, 'orient'),   // Fix 2: orientation stability fix (orient_smooth.wgsl, #orientBtn)
+    // Fix 5: phase of the statistics averaged over about the last N frames (temporal.wgsl, #temporalBtn); ?smooth=N
+    // starts on with N frames. Off by default: headless (1 px / frame) it hardly reduced the flicker (L3 0.044 -> 0.041,
+    // L2 0.101 -> 0.093) while the fine levels no longer follow the moving image (it averages in screen coordinates).
+    temporalN: Math.max(0, +(new URLSearchParams(location.search).get('smooth') || '3') || 0),
+    temporal: (new URLSearchParams(location.search).get('smooth') || '0') !== '0',
+    temporalReset: true,    // next frame without history (after switching Fix 5 on, or a new image)
+    denseCoarse: fixOn(4, 'dense'),   // Fix 4: coarse level evaluated at every pixel of the finer one (#denseBtn)
+    phaseTrack: fixOn(3, 'track'),   // Fix 3: random phase kept continuous through the +-90 deg wrap (noise_band.wgsl track, #trackBtn)
     noiseFrom: 'rep',       // noise synthesized from the extrapolated (repaired, 'rep') or the measured ('meas') statistics
     keep: [1, 1, 1],        // effect of the parameters: share of the measured intensity, orientation, phase kept in the
                             // noise (1 = as measured, 0 = random; NoiseGenerator.generate_noise keep_*)
@@ -146,12 +167,14 @@ const cyclic = (t) => {
 // phase as structure, at full strength: line (slate blue #5b7088, t = 0) -> edge (crimson #bf0c4c, t = 1), mixed by
 // sin^2(phase); as structure() in display.wgsl (which also fades to white where the band has little energy)
 const structureColor = (t) => [0.357, 0.439, 0.533].map((v, k) => v + ([0.749, 0.047, 0.298][k] - v) * t);
+// sureness of the Line / Edge judgement: sure (pale) -> unsure (dark), as case 21 / 22 in display.wgsl
+const sureColor = (t) => [0.70, 0.80, 0.76].map((v, k) => v + ([0.16, 0.10, 0.22][k] - v) * t);
 function gradient(map) {
     const stops = [];
     for (let i = 0; i <= 16; i++) {
         const t = i / 16;
         const rgb = map === 'inferno' ? inferno(t) : map === 'cyclic' ? cyclic(t) : map === 'warm' ? warm(t) : map === 'diverging' ? diverging(t)
-            : map === 'structure' ? structureColor(t) : [t, t, t];
+            : map === 'structure' ? structureColor(t) : map === 'sure' ? sureColor(t) : [t, t, t];
         stops.push(`rgb(${rgb.map((x) => Math.round(255 * x)).join(',')}) ${(100 * t).toFixed(1)}%`);
     }
     return `linear-gradient(to right, ${stops.join(', ')})`;
@@ -177,8 +200,8 @@ async function main() {
     device.addEventListener('uncapturederror', (e) => status(`WebGPU error: ${e.error.message}`, true));
 
     const names = ['common', 'sampling', 'ycbcr', 'blur', 'foveate', 'foveate_pyramid', 'pyramid_down', 'laplace',
-                   'analysis_filters', 'analysis_orient', 'lap_stats', 'lap_finalize', 'fit', 'repair_common', 'repair_init', 'repair_phi', 'repair_level', 'semantics',
-                   'noise_band', 'noise_stats', 'noise_finalize', 'compose', 'display'];
+                   'analysis_filters', 'analysis_orient', 'orient_smooth', 'lap_stats', 'lap_finalize', 'fit', 'repair_common', 'repair_init', 'repair_phi', 'repair_level', 'semantics', 'sem_smooth', 'temporal',
+                   'noise_band', 'shift', 'noise_stats', 'noise_finalize', 'compose', 'display'];
     const src = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await loadText(`${BASE}shaders/${n}.wgsl`)])));
     const consts = await (await fetch(`${BASE}constants.json`)).json();
     const code = (...parts) => parts.map((p) => src[p]).join('\n');
@@ -205,6 +228,7 @@ async function main() {
 
     const P = {
         ycbcr: computePipeline(code('ycbcr'), [tex(0, 'float'), storage(1, 'rgba32float')]),
+        shift: computePipeline(code('shift'), [uniform(0), tex(1), storage(2, 'rgba32float')]),
         blurV: computePipeline(code('blur'), [uniform(0), tex(1), storage(2, 'rgba32float')], 'blur_v'),
         blurH: computePipeline(code('blur'), [uniform(0), tex(1), storage(2, 'rgba32float'), storage(3, 'rgba16float')], 'blur_h'),
         down: computePipeline(code('sampling', 'pyramid_down'), [roStorage(0), tex(1), storage(2, 'rgba32float')]),
@@ -212,6 +236,9 @@ async function main() {
         filters: computePipeline(code('sampling', 'analysis_filters'),
             [roStorage(0), tex(1), storage(2, 'rgba32float'), storage(3, 'rgba32float'), storage(4, 'rgba32float')]),
         orient: computePipeline(code('analysis_orient'), [...texs(0, 2), storage(3, 'rgba32float')]),
+        // orientation stability fix: C2, C3 averaged with a Gaussian (two passes), then orientation without the 5x5 box
+        smoothH: computePipeline(code('orient_smooth'), [tex(0), storage(1, 'rgba32float')], 'smooth_h'),
+        smoothV: computePipeline(code('orient_smooth'), [tex(0), storage(1, 'rgba32float')], 'smooth_v'),
         foveate: computePipeline(code('common', 'foveate'),
             [uniform(0), tex(1), tex(2, 'unfilterable-float', '2d-array'), storage(3, 'rgba32float'), storage(4, 'rgba32float')]),
         foveatePyr: computePipeline(code('common', 'sampling', 'foveate_pyramid'), [uniform(0), ...texs(1, 6), storage(7, 'rgba32float')]),
@@ -221,13 +248,40 @@ async function main() {
         lapFinalize: computePipeline(code('lap_finalize'), [uniform(0), roStorage(1), rwStorage(2)]),
         fit: computePipeline(code('fit'), [uniform(0), roStorage(1), rwStorage(2)]),
         repInit: computePipeline(code('sampling', 'repair_common', 'repair_init'), [uniform(0), tex(1), storage(2, 'rgba32float'), roStorage(15)]),
-        repPhi: computePipeline(code('sampling', 'repair_common', 'repair_phi'), [uniform(0), ...texs(1, 4), storage(5, 'rgba32float')]),
-        repLevel: computePipeline(code('sampling', 'repair_common', 'repair_level'), [uniform(0), ...texs(1, 5), storage(6, 'rgba32float'), roStorage(15)]),
+        repPhi: computePipeline(code('sampling', 'repair_common', 'repair_phi'), [uniform(0), ...texs(1, 4), storage(5, 'rgba32float'), tex(6), tex(7)]),
+        repLevel: computePipeline(code('sampling', 'repair_common', 'repair_level'), [uniform(0), ...texs(1, 5), storage(6, 'rgba32float'), tex(7), roStorage(15)]),
         sem: computePipeline(code('sampling', 'repair_common', 'semantics'), [uniform(0), ...texs(1, 4), storage(5, 'rgba32float')]),
-        band: computePipeline(code('noise_band'), [uniform(0), roStorage(1), tex(2), storage(3, 'r32float'), roStorage(4)]),
+        semH: computePipeline(code('sem_smooth'), [tex(0), storage(1, 'rgba32float')], 'sem_h'),
+        semV: computePipeline(code('sem_smooth'), [tex(0), storage(1, 'rgba32float')], 'sem_v'),
+        semSure: computePipeline(code('sem_smooth'), [tex(0), storage(1, 'rgba32float')], 'sem_sure'),
+        // Fix 5: temporal phase smoothing (running average of the phase per level), and the copy back
+        temporal: computePipeline(code('temporal'), [uniform(0), ...texs(1, 2), storage(3, 'rgba32float'), storage(4, 'rgba32float')]),
+        temporalStore: computePipeline(code('temporal'), [...texs(5, 6), storage(7, 'rgba32float'), storage(8, 'rgba32float')], 'store'),
+        band: computePipeline(code('noise_band'), [uniform(0), roStorage(1), tex(2), storage(3, 'r32float'), roStorage(4), tex(5)]),
+        // phase tracking: per pixel, the orientation over the full circle, from the previous frame's state (ping-pong)
+        track: computePipeline(code('noise_band'), [uniform(0), tex(2), tex(6), storage(7, 'r32float')], 'track'),
         compose: computePipeline(code('common', 'sampling', 'compose'),
             [uniform(0), uniform(1), ...texs(2, 8), roStorage(9), storage(10, 'rgba32float'), roStorage(11)]),
     };
+
+    // same bind group layout as P.orient, so the orientation bind groups serve both entry points
+    P.orientPre = { layout: P.orient.layout, pipeline: device.createComputePipeline({
+        layout: device.createPipelineLayout({ bindGroupLayouts: [P.orient.layout] }),
+        compute: { module: device.createShaderModule({ code: code('analysis_orient') }), entryPoint: 'main_presmoothed' },
+    }) };
+
+    // Fix 4, dense coarse evaluation: the analysis of level l+1 at every pixel of level l (same filters, taps 2 px apart)
+    const sameLayout = (base, shaderCode, entryPoint) => ({ layout: base.layout, pipeline: device.createComputePipeline({
+        layout: device.createPipelineLayout({ bindGroupLayouts: [base.layout] }),
+        compute: { module: device.createShaderModule({ code: shaderCode }), entryPoint },
+    }) });
+    P.blurDense = sameLayout(P.down, code('sampling', 'pyramid_down'), 'blur_dense');
+    P.filtersDil = sameLayout(P.filters, code('sampling', 'analysis_filters'), 'main_dilated');
+    P.smoothH2 = sameLayout(P.smoothH, code('orient_smooth'), 'smooth_h2');
+    P.smoothV2 = sameLayout(P.smoothV, code('orient_smooth'), 'smooth_v2');
+    P.orientDil = sameLayout(P.orient, code('analysis_orient'), 'main_dilated');
+    P.semDense = computePipeline(code('sampling', 'repair_common', 'semantics'),
+        [uniform(0), ...texs(1, 4), storage(5, 'rgba32float'), tex(6), tex(7)], 'main_dense');
 
     const canvas = $('canvas');
     const context = canvas.getContext('webgpu');
@@ -253,10 +307,27 @@ async function main() {
     const fixedUniform = (values) => fixedBuffer(values, GPUBufferUsage.UNIFORM);
     const paramsBuffer = uniformBuffer(28 * 4);
     const composeBuffer = uniformBuffer(16);
+    // Fix 5: (alpha, 0, 0, 0) per level; frames averaged N_l = 1 + (N - 1) 2^(l - 3) (max 9): the same lag in pixels of
+    // the level (L3: N; L0 nearly none, as the image moves a whole L0 pixel per frame and averaging would mix positions)
+    const temporalBuffers = Array.from({ length: ANALYSIS_LEVELS }, () => uniformBuffer(16));
+    const temporalFrames = (l) => Math.min(1 + (state.temporalN - 1) * 2 ** (l - 3), 9);
     const fitParamsBuffer = uniformBuffer(16);
-    const repairBuffers = Array.from({ length: ANALYSIS_LEVELS }, (_, s) => fixedUniform([s, 0, 0, 0]));
+    // align = 1: orientation-convention alignment of the phase before interpolating / combining (align_sign in
+    // repair_common.wgsl); 0 = the Python reference behaviour. Toggled with #alignBtn (shown with ?fix); ?align=0 in the URL starts off.
+    const repairBuffers = Array.from({ length: ANALYSIS_LEVELS }, () => uniformBuffer(16));
     // phase semantics (semantics.wgsl) of level l from the measured (1) or the repaired (0) phases
-    const semBuffers = { measured: repairBuffers.map((_, l) => fixedUniform([l, 1, 0, 0])), repaired: repairBuffers };
+    // (own buffers: the repair's second value carries Fix 4 and the cutoff, written per frame)
+    const semBuffers = { measured: repairBuffers.map(() => uniformBuffer(16)), repaired: repairBuffers.map(() => uniformBuffer(16)) };
+    // Fix 4 (semantics.wgsl main_dense), per level: (l, measured variant, align, level l+1 measured everywhere), written per frame
+    const semDenseBuffers = Array.from({ length: ANALYSIS_LEVELS }, () => uniformBuffer(16));
+    // orient = 1: orientation stability fix in the repair (confidence-weighted orientation upsampling, repair_level.wgsl)
+    const writeAlign = () => {
+        const a = state.align ? 1 : 0, o = state.orientFix ? 1 : 0;
+        repairBuffers.forEach((b, s) => device.queue.writeBuffer(b, 0, new Float32Array([s, 0, a, o])));
+        semBuffers.measured.forEach((b, l) => device.queue.writeBuffer(b, 0, new Float32Array([l, 1, a, o])));
+        semBuffers.repaired.forEach((b, l) => device.queue.writeBuffer(b, 0, new Float32Array([l, 0, a, o])));
+    };
+    writeAlign();
     const kernelBuffer = fixedBuffer(consts.pyr_kernel, GPUBufferUsage.STORAGE);
     const filterBuffer = fixedBuffer(consts.filters, GPUBufferUsage.STORAGE);
     const bandStdsBuffer = device.createBuffer({ size: 32, usage: GPUBufferUsage.STORAGE });
@@ -341,6 +412,8 @@ async function main() {
         const w = bmp.width, h = bmp.height;
         const t0 = performance.now();
 
+        // gaze relative to the image size, so a locked / paused gaze keeps its place when the scene changes
+        const relGaze = img && state.gaze ? [state.gaze[0] / img.h, state.gaze[1] / img.w] : [0.5, 0.5];
         if (img) { img.textures.forEach((t) => t.destroy()); img.buffers.forEach((b) => b.destroy()); }
         const textures = [], buffers = [];
         const make = (tw, th, format, usage = RW, layers = 1) => {
@@ -355,7 +428,9 @@ async function main() {
 
         img.src = make(w, h, 'rgba8unorm', U.TEXTURE_BINDING | U.COPY_DST | U.RENDER_ATTACHMENT);
         device.queue.copyExternalImageToTexture({ source: bmp }, { texture: img.src }, [w, h]);
-        img.ycc = make(w, h, 'rgba32float');
+        img.base = make(w, h, 'rgba32float');   // YCbCr of the loaded image
+        img.ycc = make(w, h, 'rgba32float');    // input of the pipeline: the base image, shifted when the image moves
+        // kept for the moving input, which rebuilds the blur stack every frame
         const tmp = make(w, h, 'rgba32float'), ping = make(w, h, 'rgba32float'), pong = make(w, h, 'rgba32float');
         img.stack = make(w, h, 'rgba16float', U.TEXTURE_BINDING | U.STORAGE_BINDING, maxLayer + 1);
         for (const k of ['maps', 'fov', 'fovPyr', 'final']) img[k] = make(w, h, 'rgba32float');
@@ -371,25 +446,28 @@ async function main() {
             for (let i = 0; i < nLevels - 1; i++) set.laplace.push(make(...img.sizes[i], 'r32float'));
             for (let i = 0; i < nAnalysis; i++) {
                 set.analysis.push(make(...img.sizes[i], 'rgba32float'));
-                set.scratch.push([0, 1, 2].map(() => make(...img.sizes[i], 'rgba32float')));
+                set.scratch.push([0, 1, 2, 3].map(() => make(...img.sizes[i], 'rgba32float')));   // ra, rb, cc, tmp of the C smoothing
             }
             return set;
         };
         const pyramidGroups = (set, level0) => ({   // bind groups to build the set from `level0`
             down: set.levels.map((l, i) => i === 0 ? null : bg(P.down, [kernelBuffer, i === 1 ? level0 : set.levels[i - 1], l])),
             laplace: set.laplace.map((lap, i) => bg(P.laplace, [i === 0 ? level0 : set.levels[i], set.levels[i + 1], lap])),
-            filters: set.analysis.map((_, i) => bg(P.filters, [filterBuffer, i === 0 ? level0 : set.levels[i], ...set.scratch[i]])),
-            orient: set.analysis.map((a, i) => bg(P.orient, [...set.scratch[i], a])),
+            filters: set.analysis.map((_, i) => bg(P.filters, [filterBuffer, i === 0 ? level0 : set.levels[i], ...set.scratch[i].slice(0, 3)])),
+            smoothH: set.analysis.map((_, i) => bg(P.smoothH, [set.scratch[i][2], set.scratch[i][3]])),   // cc -> tmp
+            smoothV: set.analysis.map((_, i) => bg(P.smoothV, [set.scratch[i][3], set.scratch[i][2]])),   // tmp -> cc
+            orient: set.analysis.map((a, i) => bg(P.orient, [...set.scratch[i].slice(0, 3), a])),
         });
         img.orig = makeSet(img.ycc);
         img.fovSet = makeSet(img.fov);
         img.orig.build = pyramidGroups(img.orig, img.ycc);
         img.fovSet.build = pyramidGroups(img.fovSet, img.fov);   // base image: per-pixel blur, as the Python pipeline
 
-        // ---- per-image computation: YCbCr, blur stack, pyramid and analysis of the original
-        const encoder = device.createCommandEncoder();
-        const pass = encoder.beginComputePass();
-        run(pass, P.ycbcr, bg(P.ycbcr, [img.src, img.ycc]), w, h);
+        // ---- input: base image, shifted by img.offset (moving input); blur stack of the input (bind groups)
+        img.offset = [0, 0];
+        img.shiftU = uniformBuffer(16);
+        buffers.push(img.shiftU);
+        img.input = { shift: bg(P.shift, [img.shiftU, img.base, img.ycc]), blur: [] };
         let cur = img.ycc;
         for (let k = 1; k <= maxLayer; k++) {
             const sigma = Math.sqrt(k * k - (k - 1) * (k - 1));
@@ -398,21 +476,42 @@ async function main() {
             new Float32Array(ab, 0, 1)[0] = sigma;
             new Int32Array(ab, 4, 1)[0] = Math.trunc(2 * sigma + 0.5);
             ub.unmap();
+            buffers.push(ub);
             const next = cur === ping ? pong : ping;
-            run(pass, P.blurV, bg(P.blurV, [ub, cur, tmp]), w, h);
-            run(pass, P.blurH, bg(P.blurH, [ub, tmp, next, img.stack.createView({ dimension: '2d', baseArrayLayer: k, arrayLayerCount: 1 })]), w, h);
+            img.input.blur.push([bg(P.blurV, [ub, cur, tmp]),
+                                 bg(P.blurH, [ub, tmp, next, img.stack.createView({ dimension: '2d', baseArrayLayer: k, arrayLayerCount: 1 })])]);
             cur = next;
         }
-        buildPyramid(pass, img.orig, img.orig.build);
+
+        // ---- per-image computation: YCbCr, then the input (blur stack, pyramid and analysis of the original)
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginComputePass();
+        run(pass, P.ycbcr, bg(P.ycbcr, [img.src, img.base]), w, h);
+        buildInput(pass);
         pass.end();
         device.queue.submit([encoder.finish()]);
         await device.queue.onSubmittedWorkDone();
-        [tmp, ping, pong].forEach((t) => t.destroy());
 
         // ---- per-frame resources and bind groups
         img.rep = img.sizes.slice(0, nAnalysis).map((s) => make(...s, 'rgba32float'));
+        // Fix 5 (temporal.wgsl): history per level and the textures of the two passes
+        img.temporal = img.rep.map((r, l) => {
+            const hist = make(...img.sizes[l], 'rgba32float'), tRep = make(...img.sizes[l], 'rgba32float'), tHist = make(...img.sizes[l], 'rgba32float');
+            return {
+                main: bg(P.temporal, [temporalBuffers[l], r, hist, tRep, tHist]),
+                store: bindGroup(P.temporalStore.layout, [[5, tRep], [6, tHist], [7, r], [8, hist]]),
+            };
+        });
+        state.temporalReset = true;
         img.phi = img.sizes.slice(0, nAnalysis).map((s) => make(...s, 'rgba32float'));
         img.sem = img.sizes.slice(0, nAnalysis - 1).map((s) => make(...s, 'rgba32float'));   // level l needs level l+1
+        // Line / Edge display form (sem_smooth.wgsl, for the bicubic upsampling): intermediate and result per level
+        img.semTmp = img.sem.map((_, l) => make(...img.sizes[l], 'rgba32float'));
+        img.dense = img.sem.map((_, l) => make(...img.sizes[l], 'rgba32float'));   // Fix 4: analysis of level l+1 at level l's pixels
+        img.semAvg = img.sem.map((_, l) => make(...img.sizes[l], 'rgba32float'));
+        img.semSmoothBg = img.sem.map((t, l) => [bg(P.semH, [t, img.semTmp[l]]), bg(P.semV, [img.semTmp[l], img.semAvg[l]])]);
+        img.semSure = img.sem.map((_, l) => make(...img.sizes[l], 'rgba32float'));   // sureness (sem_smooth.wgsl sem_sure)
+        img.semSureBg = img.sem.map((t, l) => bg(P.semSure, [t, img.semSure[l]]));
         img.bands = img.sizes.slice(0, NOISE_LEVELS).map((s) => make(...s, 'r32float'));
         const partial = (gx, gy) => {
             const b = device.createBuffer({ size: gx * gy * 8, usage: GPUBufferUsage.STORAGE });
@@ -422,12 +521,18 @@ async function main() {
         const groups16 = ([sw, sh]) => [Math.ceil(sw / 16), Math.ceil(sh / 16)];
 
         img.bandU = img.bands.map(() => { const u = uniformBuffer(32); buffers.push(u); return u; });   // BandParams per level
+        // phase tracking state per noise level: two textures, written alternately (frame parity k writes [k], reads [1 - k])
+        img.track = img.sizes.slice(0, NOISE_LEVELS).map((s) => [make(...s, 'r32float'), make(...s, 'r32float')]);
+        img.trackFrame = 0;
+        img.trackReset = true;   // first frame: state = current orientation (the random phase is used as it is)
         const lvViews = [0, 1, 2, 3, 4, 5].map((i) => img.orig.levels[Math.min(i, nLevels - 1)]);
         img.bg = {
             foveate: bg(P.foveate, [paramsBuffer, img.ycc, img.stack.createView({ dimension: '2d-array' }), img.maps, img.fov]),
             foveatePyr: bg(P.foveatePyr, [paramsBuffer, ...lvViews, img.fovPyr]),
             fit: bg(P.fit, [fitParamsBuffer, lapStatsBuffer, fitBuffer]),
-            band: img.bands.map((b, s) => bg(P.band, [img.bandU[s], filterBuffer, img.rep[s], b, repStdBuffer])),
+            band: img.bands.map((b, s) => [0, 1].map((k) => bg(P.band, [img.bandU[s], filterBuffer, img.rep[s], b, repStdBuffer, img.track[s][k]]))),
+            track: img.bands.map((_, s) => [0, 1].map((k) => bindGroup(P.track.layout,
+                [[0, img.bandU[s]], [2, img.rep[s]], [6, img.track[s][1 - k]], [7, img.track[s][k]]]))),
             bandStats: img.bands.map((b, s) => {
                 const [gx, gy] = groups16([w, h]), part = partial(gx, gy);
                 return { groups: [gx, gy],
@@ -459,14 +564,27 @@ async function main() {
             }));
             set.repInit = img.rep.map((r, s) => bindGroup(P.repInit.layout, [[0, repairBuffers[s]], [1, set.analysis[s]], [2, r], [15, fitBuffer]]));
             set.repPhi = img.rep.map((_, s) => s + 2 < nAnalysis ? bg(P.repPhi, [repairBuffers[s],
-                set.analysis[s + 1], img.rep[s + 1], set.analysis[s + 2], img.rep[s + 2], img.phi[s + 1]]) : null);
+                set.analysis[s + 1], img.rep[s + 1], set.analysis[s + 2], img.rep[s + 2], img.phi[s + 1], img.dense[s + 1], img.maps]) : null);
             set.repLevel = img.rep.map((r, s) => s + 1 < nAnalysis ? bindGroup(P.repLevel.layout, [[0, repairBuffers[s]], [1, img.maps],
-                [2, set.analysis[s]], [3, img.rep[s + 1]], [4, set.analysis[s + 1]], [5, img.phi[s + 1]], [6, r], [15, fitBuffer]]) : null);
+                [2, set.analysis[s]], [3, img.rep[s + 1]], [4, set.analysis[s + 1]], [5, img.phi[s + 1]], [6, r], [7, img.dense[s]], [15, fitBuffer]]) : null);
+            // Fix 4: blur of level l without dropping pixels (into the free tmp scratch texture), filters and orientation
+            // with taps 2 px apart (the scratch textures of level l are free once its own analysis is done)
+            set.dense = img.sem.map((out, l) => {
+                const [ra, rb, cc, tmp] = set.scratch[l];
+                return {
+                    blur: bg(P.blurDense, [kernelBuffer, set.levels[l], tmp]),
+                    filters: bg(P.filtersDil, [filterBuffer, tmp, ra, rb, cc]),
+                    smoothH: bg(P.smoothH2, [cc, tmp]),
+                    smoothV: bg(P.smoothV2, [tmp, cc]),
+                    orient: bg(P.orient, [ra, rb, cc, img.dense[l]]),
+                    sem: bg(P.semDense, [semDenseBuffers[l], set.analysis[l], img.rep[l], set.analysis[l + 1], img.rep[l + 1], out, img.dense[l], img.maps]),
+                };
+            });
             set.sem = Object.fromEntries(['measured', 'repaired'].map((variant) => [variant, img.sem.map((out, l) => bg(P.sem,
                 [semBuffers[variant][l], set.analysis[l], img.rep[l], set.analysis[l + 1], img.rep[l + 1], out]))]));
         }
 
-        state.gaze = [h / 2, w / 2];
+        state.gaze = [relGaze[0] * h, relGaze[1] * w];
         state.gpuInfo = null;
         updateControls();
         resizeCanvas();
@@ -474,12 +592,36 @@ async function main() {
         requestRender();
     }
 
+    // Input of the pipeline: the base image shifted by img.offset, its blur stack (layer k: sigma = k, built
+    // incrementally) and the pyramid and analysis of the original. Once per image, or every frame when the image moves.
+    function buildInput(pass) {
+        device.queue.writeBuffer(img.shiftU, 0, new Float32Array([img.offset[0], img.offset[1], 0, 0]));
+        run(pass, P.shift, img.input.shift, img.w, img.h);
+        for (const [v, hz] of img.input.blur) {
+            run(pass, P.blurV, v, img.w, img.h);
+            run(pass, P.blurH, hz, img.w, img.h);
+        }
+        buildPyramid(pass, img.orig, img.orig.build);
+    }
+    // moving input: a slow circle of 48 px radius, one round in 12 s (about 25 px/s), in whole pixels
+    function motionOffset(t) {
+        if (!state.motion) return [0, 0];
+        const a = 2 * Math.PI * (t / 1000) / 12;
+        return [Math.round(48 * Math.cos(a)) - 48, Math.round(48 * Math.sin(a))];
+    }
+
     function buildPyramid(pass, set, groups) {   // Gaussian pyramid, Laplacian bands and analysis of one set
         for (let i = 1; i < img.nLevels; i++) run(pass, P.down, groups.down[i], ...img.sizes[i]);
         for (let i = 0; i < img.nLevels - 1; i++) run(pass, P.laplace, groups.laplace[i], ...img.sizes[i]);
         for (let i = 0; i < img.nAnalysis; i++) {
             run(pass, P.filters, groups.filters[i], ...img.sizes[i]);
-            run(pass, P.orient, groups.orient[i], ...img.sizes[i]);
+            if (state.orientFix) {   // orientation stability fix: C2, C3 over a Gaussian window instead of the 5x5 box
+                run(pass, P.smoothH, groups.smoothH[i], ...img.sizes[i]);
+                run(pass, P.smoothV, groups.smoothV[i], ...img.sizes[i]);
+                run(pass, P.orientPre, groups.orient[i], ...img.sizes[i]);
+            } else {
+                run(pass, P.orient, groups.orient[i], ...img.sizes[i]);
+            }
         }
     }
 
@@ -495,11 +637,14 @@ async function main() {
         if (v.levels) return state.enhLevel >= 0 ? 18 : 16;   // Enhancement: sum, or the contribution of one level
         if (v.fov) return v.fov[state.fovMethod];
         if (!v.stat) return v.mode;
-        const stat = v.structure && state.phaseShow === 'structure' ? v.structure : v.stat;
+        const stat = v.structure && state.phaseShow === 'structure' ? v.structure
+            : v.sure && state.phaseShow === 'sure' ? v.sure : v.stat;
         return state.variant === 'repaired' ? stat.repaired : stat.measured;
     }
     const activeSet = () => (state.analyseFoveated ? img.fovSet : img.orig);
-    const structureOn = () => !!currentView().structure && state.phaseShow === 'structure';
+    // Line / Edge or Sureness shown (both need the phase semantics of the level)
+    const structureOn = () => !!currentView().structure && state.phaseShow !== 'angle';
+    const sureOn = () => structureOn() && state.phaseShow === 'sure';
     function levelCount(kind) {
         // the phase semantics of level l need level l+1: one level fewer
         return { pyramid: img.nLevels, laplace: img.nLevels - 1, analysis: img.nAnalysis - (structureOn() ? 1 : 0) }[kind] || 1;
@@ -507,7 +652,7 @@ async function main() {
     function auxTexture(l = state.level) {
         const v = currentView(), set = activeSet();
         if (v.levels && state.enhLevel >= 0) return img.bands[state.enhLevel];
-        if (structureOn()) return img.sem[Math.min(l, img.sem.length - 1)];
+        if (structureOn()) return (sureOn() ? img.semSure : img.semAvg)[Math.min(l, img.sem.length - 1)];
         switch (v.level) {
             case 'pyramid': return l === 0 ? (state.analyseFoveated ? img.fov : img.ycc) : set.levels[l];
             case 'laplace': return set.laplace[l];
@@ -528,10 +673,11 @@ async function main() {
             // intensity of coarser levels (up to the cutoff, with their larger modulator) into level l, so the top of
             // the scale is MAG_MAX * modulator of the coarsest level that can reach level l.
             // 19, 20 (phase as structure): the same scale, it fades out where the intensity is low
-            case 10: case 12: case 19: case 20: {
+            // 21, 22 (sureness): the same as well
+            case 10: case 12: case 19: case 20: case 21: case 22: {
                 const k = Math.min(Math.max(l, state.gpuInfo ? state.gpuInfo.cutoff : l), mods.length - 1);
                 const top = MAG_MAX * Math.max(mods[k] || 0, 1e-9);
-                return mode === 10 || mode === 19 ? (mods[l] || 0) / top : 1 / top;   // measured shows |G + iH| (unmodulated)
+                return mode === 10 || mode === 19 || mode === 21 ? (mods[l] || 0) / top : 1 / top;   // measured shows |G + iH| (unmodulated)
             }
             case 16: case 18: return 4;                                // noise enhancement around mid-grey
             default: return 1;
@@ -553,7 +699,8 @@ async function main() {
     function updateLegend() {
         const v = currentView();
         const lg = v.fov && state.fovMethod === 'diff' ? DIFF_LEGEND
-            : v.structure && state.phaseShow === 'structure' ? v.structureLegend : v.legend;
+            : v.structure && state.phaseShow === 'structure' ? v.structureLegend
+            : v.sure && state.phaseShow === 'sure' ? v.sureLegend : v.legend;
         $('legend').hidden = !lg;
         if (!lg) return;
         if (lg.labels) {   // categorical ends (Line / Edge) instead of numbers
@@ -699,6 +846,12 @@ async function main() {
         const encoder = device.createCommandEncoder();
         const pass = encoder.beginComputePass();
         const [w, h] = [img.w, img.h];
+        const off = motionOffset(t);
+        if (off[0] !== img.offset[0] || off[1] !== img.offset[1] || img.inputDirty) {   // moved (or motion off, or the analysis changed): new input
+            img.offset = off;
+            img.inputDirty = false;
+            buildInput(pass);
+        }
         run(pass, P.foveate, img.bg.foveate, w, h);
         run(pass, P.foveatePyr, img.bg.foveatePyr, w, h);
         if (state.analyseFoveated) buildPyramid(pass, img.fovSet, img.fovSet.build);
@@ -711,24 +864,83 @@ async function main() {
         // repair: levels >= cutoff keep their measured statistics; below, from coarse to fine.
         // Noise from the measured statistics: every level keeps its measured statistics (no extrapolation).
         const fromMeasured = state.noiseFrom === 'meas';
-        for (let s = fromMeasured ? 0 : c; s < img.nAnalysis; s++) run(pass, P.repInit, set.repInit[s], ...img.sizes[s]);
+        // Fix 4: the analysis of level l+1 at the pixels of level l, for the repair (levels 0..cutoff) and the Line / Edge view
+        const denseDone = new Set();
+        const runDense = (l) => {
+            if (denseDone.has(l)) return;
+            denseDone.add(l);
+            const d = set.dense[l], sz = img.sizes[l];
+            run(pass, P.blurDense, d.blur, ...sz);
+            run(pass, P.filtersDil, d.filters, ...sz);
+            if (state.orientFix) {
+                run(pass, P.smoothH2, d.smoothH, ...sz);
+                run(pass, P.smoothV2, d.smoothV, ...sz);
+                run(pass, P.orientPre, d.orient, ...sz);
+            } else {
+                run(pass, P.orientDil, d.orient, ...sz);
+            }
+        };
+        const denseRepair = state.denseCoarse && !fromMeasured;
+        {   // repair parameters: (s, Fix 4 ? cutoff + 1 : 0, align, orient)
+            const a = state.align ? 1 : 0, o = state.orientFix ? 1 : 0;
+            repairBuffers.forEach((b, s) => device.queue.writeBuffer(b, 0, new Float32Array([s, denseRepair ? c + 1 : 0, a, o])));
+        }
+        if (denseRepair) for (let l = 0; l <= Math.min(c, img.dense.length - 1); l++) runDense(l);
+        // Fix 5: the phase of level s averaged over the last frames, right after s is computed (so the finer levels are
+        // extrapolated from the smoothed phase); alpha = 1 the first frame (no history yet)
+        const smoothing = state.temporal && state.temporalN > 1;
+        if (smoothing) {
+            temporalBuffers.forEach((b, l) => device.queue.writeBuffer(b, 0,
+                new Float32Array([state.temporalReset ? 1 : 2 / (temporalFrames(l) + 1), 0, 0, 0])));
+            state.temporalReset = false;
+        }
+        const smooth = (s) => {
+            if (!smoothing) return;
+            run(pass, P.temporal, img.temporal[s].main, ...img.sizes[s]);
+            run(pass, P.temporalStore, img.temporal[s].store, ...img.sizes[s]);
+        };
+        for (let s = fromMeasured ? 0 : c; s < img.nAnalysis; s++) {
+            run(pass, P.repInit, set.repInit[s], ...img.sizes[s]);
+            smooth(s);
+        }
         for (let s = fromMeasured ? -1 : c - 1; s >= 0; s--) {
             run(pass, P.repPhi, set.repPhi[s], ...img.sizes[s + 1]);
             run(pass, P.repLevel, set.repLevel[s], ...img.sizes[s]);
+            smooth(s);
         }
         if (structureOn()) {   // Line / Edge view: phase semantics of the shown level
             const l = Math.min(state.level, img.sem.length - 1);
-            run(pass, P.sem, set.sem[state.variant][l], ...img.sizes[l]);
+            if (state.denseCoarse) {   // Fix 4: coarse level evaluated at every pixel of level l
+                const measured = state.variant === 'measured';
+                device.queue.writeBuffer(semDenseBuffers[l], 0, new Float32Array([l, measured ? 1 : 0, state.align ? 1 : 0,
+                    measured || fromMeasured || l + 1 >= c ? 1 : 0]));
+                runDense(l);
+                run(pass, P.semDense, set.dense[l].sem, ...img.sizes[l]);
+            } else {
+                run(pass, P.sem, set.sem[state.variant][l], ...img.sizes[l]);
+            }
+            if (sureOn()) {
+                run(pass, P.semSure, img.semSureBg[l], ...img.sizes[l]);
+            } else {
+                run(pass, P.semH, img.semSmoothBg[l][0], ...img.sizes[l]);   // display form, upsampled bicubically
+                run(pass, P.semV, img.semSmoothBg[l][1], ...img.sizes[l]);
+            }
         }
         // noise bands of the levels below the cutoff, their std at full resolution, composition
         const randomize = Math.min(...state.keep) < 1 ? 1 : 0;
+        // phase tracking: 0 off, 1 on, 2 reset (state = current orientation); the state is updated every frame
+        const trackMode = img.trackReset ? 2 : state.phaseTrack ? 1 : 0;
+        const trackK = img.trackFrame & 1;
+        img.trackReset = false;
+        img.trackFrame++;
         for (let s = 0; s < Math.min(c, img.bands.length); s++) {
-            device.queue.writeBuffer(img.bandU[s], 0, new Float32Array([h, w, s, randomize, ...state.keep, 0]));
+            device.queue.writeBuffer(img.bandU[s], 0, new Float32Array([h, w, s, randomize, ...state.keep, trackMode]));
             if (randomize) {   // the random intensity is scaled by the std of the level's intensity_rep
                 runGroups(pass, P.lapStats, img.bg.repStd[s].stats, ...img.bg.repStd[s].groups);
                 runGroups(pass, P.lapFinalize, img.bg.repStd[s].finalize, 1, 1);
             }
-            run(pass, P.band, img.bg.band[s], ...img.sizes[s]);
+            run(pass, P.track, img.bg.track[s][trackK], ...img.sizes[s]);
+            run(pass, P.band, img.bg.band[s][trackK], ...img.sizes[s]);
             runGroups(pass, P.stats, img.bg.bandStats[s].stats, ...img.bg.bandStats[s].groups);
             runGroups(pass, P.finalize, img.bg.bandStats[s].finalize, 1, 1);
         }
@@ -767,7 +979,7 @@ async function main() {
             });
         }
         device.queue.onSubmittedWorkDone().then(() => { $('frame').textContent = `${(performance.now() - t0).toFixed(1)} ms / frame`; });
-        if (animate) requestRender();
+        if (animate || state.motion) requestRender();
     }
 
     // Intensity fit plot (SVG): band std per level (point size = weight in the fit), the fitted line, and the noise
@@ -935,6 +1147,7 @@ async function main() {
         if (!img) return;
         state.frozen = !state.frozen;
         state.gaze = gazeFromEvent(e);
+        updateGazeButtons();
         requestRender();
     });
 
@@ -952,6 +1165,66 @@ async function main() {
     document.querySelectorAll('#noiseFromBox button').forEach((b) => b.addEventListener('click', () => {
         state.noiseFrom = b.dataset.from; updateControls(); requestRender();
     }));
+    // moving input (temporal stability test): tickbox under the viewer
+    if ($('motion')) $('motion').addEventListener('change', (e) => { state.motion = e.target.checked; requestRender(); });
+    // phase alignment fix on / off: small button under the viewer, hidden unless the URL has ?fix (or ?align=0 / 1)
+    const alignBtn = $('alignBtn');
+    const urlParams = URL_PARAMS;
+    if (alignBtn) {
+        alignBtn.hidden = !(urlParams.has('fix') || urlParams.has('align'));
+        const showAlign = () => { alignBtn.textContent = `Fix 1 · Phase Sign Alignment: ${state.align ? 'On' : 'Off'}`; alignBtn.classList.toggle('on', state.align); };
+        showAlign();
+        alignBtn.addEventListener('click', () => { state.align = !state.align; writeAlign(); showAlign(); requestRender(); });
+    }
+    // phase tracking on / off (debug): shown with ?fix or ?track=0 / 1; may be missing on the website page
+    // Fix 4 on / off: shown with ?fix or ?dense=0 / 1; may be missing on the website page
+    const denseBtn = $('denseBtn');
+    if (denseBtn) {
+        denseBtn.hidden = !(urlParams.has('fix') || urlParams.has('dense'));
+        const showDense = () => { denseBtn.textContent = `Fix 4 · Dense Coarse Evaluation: ${state.denseCoarse ? 'On' : 'Off'}`; denseBtn.classList.toggle('on', state.denseCoarse); };
+        showDense();
+        denseBtn.addEventListener('click', () => { state.denseCoarse = !state.denseCoarse; showDense(); requestRender(); });
+    }
+    // Fix 5 on / off: shown with ?fix or ?smooth=N; may be missing on the website page
+    const temporalBtn = $('temporalBtn');
+    if (temporalBtn) {
+        temporalBtn.hidden = !(urlParams.has('fix') || urlParams.has('smooth'));
+        if (state.temporalN < 2) state.temporalN = 3;
+        const showTemporal = () => {
+            temporalBtn.textContent = `Fix 5 · Temporal Phase Smoothing (${state.temporalN} frames at L3): ${state.temporal ? 'On' : 'Off'}`;
+            temporalBtn.classList.toggle('on', state.temporal);
+        };
+        showTemporal();
+        temporalBtn.addEventListener('click', () => {
+            state.temporal = !state.temporal; state.temporalReset = true; showTemporal(); requestRender();
+        });
+    }
+    const trackBtn = $('trackBtn');
+    if (trackBtn) {
+        trackBtn.hidden = !(urlParams.has('fix') || urlParams.has('track'));
+        const showTrack = () => { trackBtn.textContent = `Fix 3 · Random Phase Tracking: ${state.phaseTrack ? 'On' : 'Off'}`; trackBtn.classList.toggle('on', state.phaseTrack); };
+        showTrack();
+        trackBtn.addEventListener('click', () => {
+            state.phaseTrack = !state.phaseTrack;
+            if (img) img.trackReset = true;   // start again from the current orientation
+            showTrack();
+            requestRender();
+        });
+    }
+    // orientation stability fix on / off (debug): shown with ?fix or ?orient=0 / 1; may be missing on the website page
+    const orientBtn = $('orientBtn');
+    if (orientBtn) {
+        orientBtn.hidden = !(urlParams.has('fix') || urlParams.has('orient'));
+        const showOrient = () => { orientBtn.textContent = `Fix 2 · Orientation Smoothing: ${state.orientFix ? 'On' : 'Off'}`; orientBtn.classList.toggle('on', state.orientFix); };
+        showOrient();
+        orientBtn.addEventListener('click', () => {
+            state.orientFix = !state.orientFix;
+            writeAlign();
+            if (img) img.inputDirty = true;   // the analysis of the original is rebuilt with the other orientation estimate
+            showOrient();
+            requestRender();
+        });
+    }
     document.querySelectorAll('#enhBox button').forEach((b) => b.addEventListener('click', () => {
         state.enhOn = b.dataset.enh === '1'; updateControls(); requestRender();
     }));
@@ -1029,17 +1302,24 @@ async function main() {
         eye: ICON(EYE_BOX, '<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
         eyeOff: ICON(EYE_BOX, '<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M5 5l14 14"/>'),
     };
+    // the automatic movement runs when it is switched on and the gaze is not locked by a click on the image
+    const gazeRunning = () => state.autoGaze && !state.frozen;
     function updateGazeButtons() {
         const a = $('autoGazeBtn'), g = $('showGazeBtn');
-        a.innerHTML = state.autoGaze ? GAZE_ICON.pause : GAZE_ICON.play;
-        a.title = state.autoGaze ? 'Pause the automatic eye movement (it runs while the mouse is not over the image)'
-                                 : 'Resume the automatic eye movement (it runs while the mouse is not over the image)';
+        a.innerHTML = gazeRunning() ? GAZE_ICON.pause : GAZE_ICON.play;
+        a.title = gazeRunning() ? 'Pause the automatic eye movement (it runs while the mouse is not over the image)'
+                                : 'Resume the automatic eye movement (it runs while the mouse is not over the image)';
         g.innerHTML = state.showGaze ? GAZE_ICON.eye : GAZE_ICON.eyeOff;
         g.title = state.showGaze ? 'Hide the gaze marker' : 'Show the gaze marker';
         a.setAttribute('aria-label', a.title);
         g.setAttribute('aria-label', g.title);
     }
-    $('autoGazeBtn').addEventListener('click', () => { state.autoGaze = !state.autoGaze; updateGazeButtons(); requestRender(); });
+    $('autoGazeBtn').addEventListener('click', () => {
+        if (gazeRunning()) state.autoGaze = false;
+        else { state.autoGaze = true; state.frozen = false; }   // play also releases a gaze locked by a click
+        updateGazeButtons();
+        requestRender();
+    });
     $('showGazeBtn').addEventListener('click', () => { state.showGaze = !state.showGaze; updateGazeButtons(); requestRender(); });
     updateGazeButtons();
     // scene button: cycles through the scenes listed in the (hidden) #image select of the page

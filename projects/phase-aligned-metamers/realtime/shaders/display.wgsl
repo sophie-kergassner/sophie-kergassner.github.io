@@ -5,7 +5,10 @@
 //    7 Laplacian band, 8 orientation, 9 phase, 10 magnitude |G + iH|       (measured)
 //   11 pyramid image (RGB),
 //   12 intensity_rep, 13 dir_rep, 14 phase_rep                             (after the repair)
-//   19, 20 phase semantics as structure (line / edge / none), measured / repaired (aux: semantics.wgsl of level l)
+//   19, 20 phase semantics as structure (line / edge / none), measured / repaired (aux: semantics.wgsl of level l;
+//          in the form of sem_smooth.wgsl, upsampled bicubically)
+//   21, 22 sureness of the Line / Edge judgement, measured / repaired (aux: sem_smooth.wgsl sem_sure of level l,
+//          upsampled bicubically): sure (pale) -> unsure (dark), white where the band has little energy
 //   15 final image, 16 noise enhancement,
 //   18 contribution of level l to the noise enhancement (aux = noise band l):
 //      upsample(band_l) / std_l * modulator_l * clamp(level - l, 0, 1), as one term of compose.wgsl
@@ -128,7 +131,18 @@ fn fs(in: VSOut) -> @location(0) vec4<f32> {
         case 12: { rgb = warm(a.x * P.aux.y); }
         // phase semantics (aux = semantics.wgsl output: (sem, strength)), 19 measured / 20 repaired; the strength is
         // scaled as in the intensity views (10 / 12)
-        case 19, 20: { rgb = structure(a.x, a.y * P.aux.y); }
+        case 19, 20: {
+            // sem_smooth.wgsl form, upsampled bicubically: (strength * cos 2 sem, strength)
+            let z = upsample_at(aux, p, exp2(f32(l))).xy;
+            let c2 = clamp(z.x / max(z.y, 1e-12), -1.0, 1.0);   // averaged cos(2 sem): sin^2 of 0.5 acos(c2) = (1 - c2) / 2
+            rgb = structure(0.5 * acos(c2), max(z.y, 0.0) * P.aux.y);
+        }
+        case 21, 22: {   // (strength * unsureness, strength), upsampled bicubically
+            let z = upsample_at(aux, p, exp2(f32(l))).xy;
+            let u = clamp(z.x / max(z.y, 1e-12), 0.0, 1.0);
+            let hue = mix(vec3<f32>(0.70, 0.80, 0.76), vec3<f32>(0.16, 0.10, 0.22), u);
+            rgb = mix(vec3<f32>(0.945, 0.937, 0.890), hue, clamp(2.0 * max(z.y, 0.0) * P.aux.y, 0.0, 1.0));
+        }
         case 15: { rgb = ycc_to_rgb(fin.rgb); }
         case 16: { rgb = vec3<f32>(0.5 + fin.a * P.aux.y); }
         case 18: {

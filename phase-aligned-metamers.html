@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="projects.css">
     <link rel="stylesheet" href="projects/phase-aligned-metamers/phase-aligned-metamers-style.css">
+    <link rel="stylesheet" href="projects/phase-aligned-metamers/study/study.css?v=31">
 
     <meta property="og:title" content="It’s Not Just a Phase: Creating Phase-Aligned Peripheral Metamers" />
     <meta property="og:description" content="We present a method for enhancing the perceived quality of foveated images by extrapolating local image statistics, such as intensity, orientation and especially phase, from coarse to fine scales. In particular, we demonstrate that correct phase alignment across space and scales is crucial for achieving perceptually convincing image quality." />
@@ -66,17 +67,17 @@
                     <svg width="18" height="12" viewBox="9 0 18 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
                     Code (GitHub)
                 </a>
+                <a class="button-link" href="https://doi.org/10.5281/zenodo.24483038" target="_blank" >
+                    <svg width="18" height="12" viewBox="9 0 18 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
+                    Dataset (Zenodo)
+                </a>
                 <a class="button-link" href="https://dl.acm.org/doi/10.1145/3799902.3811056" target="_blank" > 
                     <svg width="18" height="12" viewBox="9 0 18 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
                     ACM Digital Library
                 </a>
-                <a class="button-link" href="https://www.pdf.inf.usi.ch" target="_blank" >    
-                    <svg width="18" height="12" viewBox="9 0 18 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 21L21 3M15 3h6v6" /></svg>
-                    Group Page
-                </a>
             </div>
 
-            <div class="pam-demo pam-teaser" data-pam-demo data-base="projects/phase-aligned-metamers/realtime/">
+            <div class="pam-demo pam-teaser" data-pam-demo data-fixes="1,2" data-base="projects/phase-aligned-metamers/realtime/">
                 <div class="pam-canvas"><canvas id="canvas"></canvas>
                     <div id="legend" class="pam-legend" hidden><span id="legendMin"></span><div id="legendBar" class="pam-legend-bar"></div><span id="legendMax"></span><span id="legendUnit" class="pam-legend-unit"></span></div>
                     <div id="levelBox" class="pam-seg pam-overlay pam-levels" title="pyramid level" hidden></div>
@@ -105,6 +106,7 @@
                             <option value="projects/phase-aligned-metamers/realtime/images/italianflat.jpg">Italian Flat</option>
                             <option value="projects/phase-aligned-metamers/realtime/images/mossytree.jpg">Mossy Tree</option>
                         </select><button type="button" id="infoBtn" class="pam-fs" aria-expanded="false"></button><button type="button" id="sceneBtn" class="pam-fs"></button><button type="button" id="autoGazeBtn" class="pam-fs"></button><button type="button" id="showGazeBtn" class="pam-fs"></button><button type="button" id="fullscreen" class="pam-fs" title="Full screen (Esc to leave); the foveation follows the image's physical size" aria-label="Full screen"></button></div></div>
+                <div class="pam-fixes"><button type="button" id="alignBtn" hidden title="Fix 1 - Phase sign alignment at +-90 deg. The orientation wraps from -90 to +90 deg, and the phase flips its sign there. With the fix, phases are brought to one sign convention before they are interpolated or combined across levels (removes broken structures along horizontal features). Off = as in the paper.">Fix 1 · Phase Sign Alignment: On</button><button type="button" id="orientBtn" hidden title="Fix 2 - Orientation smoothing. The orientation is computed from C2, C3 averaged over a 7x7 Gaussian window (sigma 2 px) instead of the 5x5 box, and the repair weights upsampled orientations by their confidence. Steadier orientation and phase when the image moves. Off = as in the paper.">Fix 2 · Orientation Smoothing: On</button></div>
                 <p id="viewNote" class="pam-note" hidden></p>
                 <div id="flow" class="pam-flow"></div>
 
@@ -187,12 +189,6 @@
             </div>
         </div>
 
-        <div class="section">    
-            <h2>Summary Video</h2>
-            <div class="video">
-                <iframe style="width:100%; aspect-ratio:16/9; height:auto;" src="https://www.youtube.com/embed/pIEw7ndyX1o?si=oP_ImCr24sLGyZRQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-            </div>
-        </div>
 
         <div class="section">
             <h2>Abstract</h2>
@@ -200,6 +196,66 @@
                 Novel display technologies can deliver high-quality images across a wide field of view, creating immersive experiences. While rendering for such devices is expensive, most of the content falls into peripheral vision, where human perception differs from that in the fovea. Consequently, it is critical to understand and leverage the limitations of visual perception to enable efficient rendering. A standard approach is to exploit the reduced sensitivity to spatial details in the periphery by reducing rendering resolution, so-called foveated rendering. While this strategy avoids rendering part of the content altogether, an alternative promising direction is to replace accurate and expensive rendering with inexpensive synthesis of content that is perceptually indistinguishable from the ground-truth image. In this paper, we propose such a method for the efficient generation of an image signal that substitutes the rendering of high-frequency details. The method is grounded in findings from image statistics, which show that preserving appropriate local statistics is critical for perceived image quality. Based on this insight, we extrapolate several local image statistics from foveated content into higher spatial frequency ranges that are attenuated or omitted in the rendering process. This rich set of statistics is later used to synthesize a signal that is added to the initial rendering, boosting its perceived quality. We focus on phase information, demonstrating the importance of its alignment across space and frequencies. We calibrate and compare our method with state-of-the-art strategies, showing a significant reduction in the content that must be accurately rendered at a relatively small extra cost for synthesizing the additional signal.
             </p>
         </div>
+        <div class="section">
+            <h2>Summary Video</h2>
+            <div class="video">
+                <iframe style="width:100%; aspect-ratio:16/9; height:auto;" src="https://www.youtube.com/embed/pIEw7ndyX1o?si=oP_ImCr24sLGyZRQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+            </div>
+        </div>
+
+        
+        <div class="section">
+            <h2>User Study</h2>
+            <p>
+                Step into the observer's seat. This viewer shows every stimulus of our user study, either in 3D, exactly as it
+                appeared from the observer's eye, or flat in 2D, together with the viewing geometry: where the display sat, where
+                observers looked, and how far into the periphery each image fell. Pick a scene, method and blur level to see what
+                observers were shown and how often they spotted the difference. For the full study design and analysis, have a look
+                at the <a href="https://dl.acm.org/doi/epdf/10.1145/3799902.3811056" target="_blank">paper</a>.
+            </p>
+
+            <div class="pam-demo pam-study" data-pam-study data-base="projects/phase-aligned-metamers/study/">
+                <div class="pam-canvas">
+                    <canvas id="psCanvas"></canvas>
+                    <div class="pam-seg ps-viewbtns">
+                        <button type="button" id="psView2d" title="the image as it was shown on the display, front-on">2D View</button>
+                        <button type="button" id="psRingsBtn" class="on" title="eccentricity around the line of sight, in degrees">Eccentricity Rings</button>
+                        <button type="button" id="psSetupBtn" title="show the scene at its real size on your screen" aria-expanded="false">FOV Settings</button>
+                        <button type="button" id="psResetView" title="look at the fixation point again">Reset View</button>
+                    </div>
+                    <p class="ps-hint">Drag to look around, scroll to zoom.</p>
+                    <div id="psSetup" class="pam-popover ps-setup" hidden>
+                        <label class="ps-num">Screen width <span><input id="psScreenCm" type="number" min="10" max="1000" step="0.1"> cm</span></label>
+                        <label class="ps-num">Viewing distance <span><input id="psDist" type="number" min="10" max="1000" step="1"> cm</span></label>
+                        <p class="ps-setup-note">Measure the width of your whole screen with a ruler. True Size then shows the scene at its real angular size, for an eye at this distance in front of the image.</p>
+                        <div class="ps-num">Fixation point <span id="psEyePos" class="pam-seg"></span></div>
+                        <span class="pam-seg"><button type="button" id="psTrue">True Size</button></span>
+                        <p id="psFovInfo" class="ps-setup-note"></p>
+                    </div>
+                    <button type="button" id="psFullscreen" class="pam-fs" title="Full screen (Esc to leave)" aria-label="Full screen"></button>
+                </div>
+                <p class="pam-credits">
+                    The images are previews at half resolution: the finest differences tested in the study are not visible here.
+                    The full-resolution stimuli and all data are in the
+                    <a href="https://doi.org/10.5281/zenodo.24483038" target="_blank">dataset on Zenodo</a>.
+                </p>
+
+                <div class="ps-main">
+                <div class="ps-controls">
+                    <span class="ps-label">Scene</span><span id="psScene" class="pam-seg"></span>
+                    <span class="ps-label">Method</span><span id="psFamily" class="pam-seg"></span>
+                    <span class="ps-label">Variant</span><span id="psMethod" class="pam-seg"></span>
+                    <span class="ps-label">Foveal Mask</span><span id="psEcc" class="pam-seg"></span>
+                    <span class="ps-label">Level</span><span class="ps-levelrow"><span id="psLevel" class="pam-seg"></span><button type="button" id="psAutoLevel" class="ps-check" title="always select the highest level below the 75 % threshold of this method and mask, i.e. the strongest degradation observers could not reliably detect">Auto-select highest invisible level</button></span>
+                    <span class="ps-label">Reference</span><span id="psRef" class="pam-seg"></span>
+                </div>
+                <div id="psChart"></div>
+                </div>
+                <div id="psText" hidden></div>
+
+            </div>
+        </div>
+
         
         <div class="section">    
             <h2>Fast Forward</h2>
@@ -239,6 +295,7 @@
 
 
     <script type="module" src="projects/phase-aligned-metamers/realtime/main.js"></script>
+    <script type="module" src="projects/phase-aligned-metamers/study/study.js?v=32"></script>
 
 
     <script src="bib-copy.js" defer></script>
